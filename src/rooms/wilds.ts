@@ -1,62 +1,32 @@
 import { defRoom } from '../registry';
+import { SCENES } from './scenes';
 import { G } from '../game';
-import * as A from '../art';
-import { FB, rng } from '../gfx';
 import { DIR, LOOKS } from '../sprites';
 import { buy, leave, within } from './common';
 
-const forestBackdrop = (fb: FB, seed: number, dark = false) => {
-  fb.rect(0, 0, 320, 120, dark ? 0 : 2);
-  fb.dither(0, 0, 320, 120, dark ? 0 : 2, dark ? 2 : 0, dark ? 1 : 2);
-  const r = rng(seed);
-  for (let i = 0; i < 16; i++) fb.circle(r() * 320, r() * 70, 16 + r() * 22, 2, dark ? 0 : 10, dark ? 1 : 2);
-  for (let i = 0; i < 12; i++) {
-    const x = r() * 320;
-    fb.rect(x, 20 + r() * 40, 5 + r() * 4, 100, dark ? 0 : 6);
-    fb.vline(x, 20, 119, 0);
-  }
-  fb.dither(0, 0, 320, 14, 9, dark ? 0 : 2, 1);
-};
 
 // ---------------------------------------------------------------------------------------
 // Crossroads and the woods
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.crossroads,
   id: 'crossroads', name: 'Crossroads', outdoor: true, area: 'wild', arena: 'forest',
   minY: 112,
   blocks: [{ x: 150, y: 136, w: 10, h: 5 }],
   exits: { left: 'towngate', right: 'deepwood', up: 'northwood', down: 'meadow' },
   encounters: { chance: 0.15, day: [], night: ['goblin', 'wolf'] },
-  bg(fb) {
-    A.sky(fb, 100, 41, 3);
-    A.mountains(fb, 90, 50, 3);
-    A.hills(fb, 112, 18, 7);
-    A.grass(fb, 112, 8);
-    A.dirt(fb, [[0, 150], [120, 140], [130, 112], [175, 112], [180, 140], [320, 146], [320, 172], [190, 168], [200, 200], [120, 200], [125, 170], [0, 178]], 9);
-    A.tree(fb, 30, 118, 22, 3); A.tree(fb, 280, 116, 20, 4); A.tree(fb, 60, 112, 12, 8, 'pine'); A.tree(fb, 250, 112, 10, 9, 'pine');
-    A.bush(fb, 300, 190, 20, 3); A.bush(fb, 20, 196, 18, 6);
-    A.rock(fb, 90, 190, 7, 3);
-  },
-  props: [{ y: 140, draw(fb) { A.signpost(fb, 155, 141); } }],
   things: [{ names: ['sign', 'signpost', 'post'], look: 'The signpost reads:\n\n  WEST .... Thornwick\n  NORTH ... Castle road, Faerie Glen\n  EAST .... Deepwood, Kobold Caves\n  SOUTH ... Meadow, Troll Bridge, Wizard\'s Tower\n\nSomeone has carved "BRIGANDS NE" into the post, with an arrow.' }],
   desc: 'Four roads meet at a weathered signpost. Thornwick lies to the west; the woods close in to the north and east, and a meadow opens to the south.',
 });
 
 defRoom({
+  ...SCENES.northwood,
   id: 'northwood', name: 'North Woods', outdoor: true, area: 'wild', arena: 'forest',
   minY: 124,
   blocks: [{ x: 70, y: 138, w: 18, h: 6 }],
   exits: { left: 'castlegate', right: 'faerie', down: 'crossroads' },
   encounters: { chance: 0.35, day: ['goblin', 'wolf'], night: ['wolf', 'goblin', 'saurus'] },
-  bg(fb) {
-    forestBackdrop(fb, 11);
-    A.grass(fb, 120, 13);
-    A.dirt(fb, [[120, 200], [140, 150], [0, 140], [0, 160], [150, 165], [320, 150], [320, 136], [180, 140], [180, 200]], 2);
-    A.tree(fb, 260, 180, 22, 5); A.bush(fb, 20, 190, 22, 5); A.bush(fb, 300, 128, 18, 4);
-    A.rock(fb, 220, 188, 8, 3);
-  },
-  props: [{ y: 142, draw(fb) { A.tree(fb, 79, 142, 34, 21); } }],
   things: [
     { names: ['tree', 'oak'], look: 'An ancient oak with low, thick branches. Perfect for climbing.' },
     { names: ['forest', 'woods', 'trees'], look: 'The North Woods are thick and green, and not entirely friendly.' },
@@ -82,23 +52,12 @@ defRoom({
 });
 
 defRoom({
+  ...SCENES.deepwood,
   id: 'deepwood', name: 'Deepwood', outdoor: true, area: 'wild', arena: 'forest',
   minY: 126,
   blocks: [{ x: 200, y: 158, w: 50, h: 6 }],
   exits: { left: 'crossroads', right: 'koboldcave', up: 'faerie', down: 'trollbridge' },
   encounters: { chance: 0.45, day: ['goblin', 'saurus', 'wolf'], night: ['wolf', 'saurus', 'goblin'] },
-  bg(fb) {
-    forestBackdrop(fb, 23, true);
-    A.grass(fb, 122, 17);
-    fb.dither(0, 122, 320, 78, 2, 0, 2);
-    A.dirt(fb, [[0, 150], [140, 145], [150, 122], [178, 122], [185, 150], [320, 148], [320, 170], [180, 172], [170, 200], [140, 200], [140, 172], [0, 174]], 8);
-    A.tree(fb, 30, 196, 26, 3, 'dead'); A.tree(fb, 292, 138, 22, 7, 'dead');
-    for (let i = 0; i < 5; i++) { fb.circle(40 + i * 55, 135, 1, 14); fb.pset(40 + i * 55 + 3, 135, 14); }
-  },
-  props: [{ y: 162, draw(fb) {
-    fb.rect(200, 152, 50, 10, 6); fb.ellipse(250, 157, 4, 5, 8); fb.ellipse(250, 157, 2, 3, 6);
-    fb.hline(200, 249, 152, 8); fb.speckle(200, 152, 50, 10, 2, 0.2, 5);
-  } }],
   things: [
     { names: ['log', 'fallen log'], look: 'A mossy fallen log. Something has been gnawing on it.' },
     { names: ['eyes', 'yellow'], look: 'Pairs of yellow eyes watch you from the undergrowth. They blink out when you look straight at them.' },
@@ -124,37 +83,11 @@ defRoom({
 const RING = { x: 160, y: 158, rx: 62, ry: 20 };
 
 defRoom({
+  ...SCENES.faerie,
   id: 'faerie', name: 'Faerie Glen', outdoor: true, area: 'wild', arena: 'forest',
   minY: 124,
   exits: { left: 'northwood', right: 'fortressgate', down: 'deepwood' },
   encounters: { chance: 0.2, day: ['saurus'], night: [] },
-  bg(fb) {
-    A.sky(fb, 60, 51, 2);
-    forestBackdrop(fb, 51);
-    fb.ellipse(160, 0, 74, 44, 2, 9, 0);
-    fb.ellipse(160, 0, 64, 36, 9);
-    fb.ellipse(160, 8, 50, 20, 11, 9, 1);
-    A.grass(fb, 118, 19);
-    fb.ellipse(RING.x, RING.y, RING.rx + 6, RING.ry + 4, 10, 2, 0);
-    for (let i = 0; i < 22; i++) {
-      const a = (i / 22) * Math.PI * 2, x = RING.x + Math.cos(a) * RING.rx, y = RING.y + Math.sin(a) * RING.ry;
-      fb.rect(x, y - 3, 2, 3, 15); fb.ellipse(x + 1, y - 4, 3, 2, 4); fb.pset(x, y - 5, 15);
-    }
-    A.tree(fb, 18, 170, 26, 12); A.tree(fb, 300, 172, 26, 13);
-    A.flowers(fb, 0, 124, 320, 76, [13, 15, 11], 5, 40);
-  },
-  anim(fb, t) {
-    if (!G.isNight) return;
-    fb.map = null;
-    for (let i = 0; i < 9; i++) {
-      const a = t * (0.6 + (i % 3) * 0.2) + (i / 9) * Math.PI * 2;
-      const x = RING.x + Math.cos(a) * (RING.rx - 16 + (i % 2) * 10), y = RING.y - 14 + Math.sin(a) * (RING.ry - 4) + Math.sin(t * 5 + i) * 4;
-      fb.circle(x, y, 2, i % 2 ? 13 : 11);
-      fb.pset(x, y, 15);
-      fb.pset(x - 3, y - 1 + (Math.floor(t * 10 + i) % 2), 15); fb.pset(x + 3, y - 1 + (Math.floor(t * 10 + i) % 2), 15);
-      fb.pset(x - Math.cos(a) * 6, y - Math.sin(a) * 3, 14);
-    }
-  },
   things: [
     { names: ['mushroom', 'mushrooms', 'toadstool', 'toadstools', 'ring'], look: 'A perfect ring of red-capped toadstools: a faerie ring. It would be very rude to disturb it.' },
     { names: ['faerie', 'faeries', 'fairy', 'fairies', 'light', 'lights'], look: () => G.isNight ? 'Tiny winged people, no taller than your hand, whirl in a glittering dance above the toadstools. They giggle as they fly.' : 'There are no faeries here now. They only come out at night.' },
@@ -199,22 +132,12 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.meadow,
   id: 'meadow', name: 'Flower Meadow', outdoor: true, area: 'wild', arena: 'forest',
   minY: 116,
   blocks: [{ x: 58, y: 162, w: 44, h: 8 }],
   exits: { left: 'healer', up: 'crossroads', right: 'trollbridge' },
   encounters: { chance: 0.25, day: ['saurus'], night: ['goblin', 'wolf'] },
-  bg(fb) {
-    A.sky(fb, 100, 61, 4);
-    A.mountains(fb, 96, 44, 14);
-    A.hills(fb, 116, 16, 3);
-    A.grass(fb, 116, 23);
-    A.flowers(fb, 0, 120, 320, 80, [14, 15, 13], 17, 60);
-    A.flowers(fb, 200, 150, 110, 44, [12, 14, 12, 4], 29, 60);
-    A.dirt(fb, [[150, 116], [168, 116], [175, 150], [320, 160], [320, 172], [170, 166], [100, 150], [0, 152], [0, 142], [100, 140]], 11);
-    A.tree(fb, 290, 122, 16, 6);
-  },
-  props: [{ y: 168, draw(fb) { A.rock(fb, 80, 160, 22, 10); A.rock(fb, 104, 168, 6, 3); A.rock(fb, 56, 168, 5, 2); } }],
   things: [
     { names: ['flame-lily', 'flamelily', 'lily', 'lilies', 'flower', 'flowers'], look: () => G.isNight ? 'The flame-lilies have closed for the night, but they glow faintly, like embers.' : 'Bright orange flame-lilies bloom in a patch near the eastern path. Their petals flicker like tiny flames in the breeze.' },
     { names: ['rock', 'rocks', 'boulder', 'stone', 'stones'], look: 'A big mossy boulder, surrounded by smooth stones just the right size for throwing.' },
@@ -251,6 +174,7 @@ defRoom({
 const nestDown = () => !!G.flag('nestDown');
 
 defRoom({
+  ...SCENES.healer,
   id: 'healer', name: "Healer's Cottage", outdoor: true, area: 'wild', arena: 'forest',
   minY: 128,
   blocks: [{ x: 250, y: 150, w: 26, h: 6 }, { x: 150, y: 128, w: 46, h: 22 }],
@@ -258,41 +182,6 @@ defRoom({
   doors: [{
     rect: { x: 60, y: 128, w: 18, h: 4 }, to: 'healerin', at: [150, 188], dir: DIR.UP, names: ['door', 'cottage', 'hut'],
     check: () => { if (within(7, 20)) return true; G.say('The door is locked. A hand-lettered sign reads: "CLOSED. Open 7 in the morning to 8 at night. If you are bleeding, bleed quietly."'); return false; },
-  }],
-  bg(fb) {
-    A.sky(fb, 90, 71, 3);
-    A.hills(fb, 110, 20, 13);
-    A.grass(fb, 124, 29);
-    // cottage with thatched roof
-    fb.rect(20, 84, 110, 44, 15); fb.speckle(20, 84, 110, 44, 7, 0.08, 3);
-    fb.rect(20, 84, 3, 44, 6); fb.rect(127, 84, 3, 44, 6);
-    fb.poly([[10, 86], [140, 86], [118, 52], [32, 52]], 14, 6, 0);
-    for (let y = 56; y < 86; y += 4) fb.hline(22 - (y - 56) * 0.4, 128 + (y - 56) * 0.4, y, 6);
-    fb.rect(100, 40, 10, 16, 8); fb.rect(98, 38, 14, 3, 7);
-    A.door(fb, 60, 128, 18, 28, 2);
-    fb.rect(32, 94, 16, 12, 3); fb.frame(31, 93, 18, 14, 6); fb.vline(40, 94, 105, 6);
-    fb.rect(96, 94, 16, 12, 3); fb.frame(95, 93, 18, 14, 6); fb.vline(104, 94, 105, 6);
-    for (let i = 0; i < 5; i++) fb.line(84 + i * 3, 86, 84 + i * 3, 96, [4, 2, 14, 5, 12][i]);
-    // herb garden fence
-    for (let x = 150; x < 200; x += 6) fb.rect(x, 128, 2, 16, 6);
-    fb.hline(150, 198, 132, 6); fb.hline(150, 198, 140, 6);
-    A.flowers(fb, 152, 142, 44, 12, [5, 13, 14, 2], 41, 30);
-    A.dirt(fb, [[60, 128], [80, 128], [120, 200], [70, 200]], 3);
-    A.dirt(fb, [[100, 150], [320, 156], [320, 168], [100, 170]], 4);
-    A.rock(fb, 30, 180, 8, 3);
-  },
-  get lights() { return [{ x: 32, y: 94, w: 16, h: 12 }, { x: 96, y: 94, w: 16, h: 12 }]; },
-  props: [{
-    y: 154, draw(fb, t) {
-      A.tree(fb, 262, 154, 40, 88);
-      if (!nestDown()) {
-        fb.ellipse(282, 50, 9, 4, 6); fb.ellipse(282, 48, 7, 2, 8);
-        fb.line(274, 52, 290, 47, 0);
-        if (Math.floor(t * 2) % 5 === 0) fb.pset(284, 45, 15);
-      } else if (!G.flag('gotRing')) {
-        fb.ellipse(236, 168, 7, 3, 6); fb.ellipse(236, 167, 5, 1, 8);
-      }
-    },
   }],
   things: [
     { names: ['nest'], look: () => nestDown() ? (G.flag('gotRing') ? 'The empty nest lies on the grass.' : 'The nest lies in the grass where it fell. Something glints inside it.') : 'High in the branches of the big oak is a large, untidy bird\'s nest. Something in it glints in the light.' },
@@ -363,19 +252,11 @@ defRoom({
 });
 
 defRoom({
+  ...SCENES.healerin,
   id: 'healerin', name: "Mother Hilde's Cottage", outdoor: false, area: 'inside',
   minY: 136,
   blocks: [{ x: 200, y: 136, w: 40, h: 12 }],
   exits: { down: leave('healer', 69, 136, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 15, wall2: 7, floor: 6, floor2: 8, wallH: 112 });
-    for (let x = 0; x < 320; x += 50) fb.rect(x, 0, 4, 112, 6);
-    fb.rect(0, 6, 320, 4, 6);
-    A.shelves(fb, 14, 26, 120, 4, 17);
-    for (let i = 0; i < 9; i++) { const x = 160 + i * 16; fb.line(x, 10, x, 22, 6); fb.ellipse(x, 26, 4, 6, [2, 10, 14, 5, 2, 12, 10, 13, 2][i]); }
-    fb.rect(270, 40, 34, 28, 3); fb.frame(270, 40, 34, 28, 6); fb.vline(287, 40, 67, 6);
-  },
-  anim(fb, t) { A.cauldron(fb, 220, 140, t); A.fire(fb, 220, 141, t, 0.6); },
   npcs: [{
     id: 'hilde', name: 'Mother Hilde', names: ['hilde', 'mother', 'healer', 'woman', 'old woman', 'lady'], look: LOOKS.healer,
     x: 140, y: 146, dir: DIR.DOWN,
@@ -478,6 +359,7 @@ function trollFight() {
 }
 
 defRoom({
+  ...SCENES.trollbridge,
   id: 'trollbridge', name: 'Troll Bridge', outdoor: true, area: 'wild', arena: 'bridge',
   minY: 118,
   blocks: [{ x: 174, y: 118, w: 146, h: 22 }, { x: 174, y: 160, w: 146, h: 40 }],
@@ -495,27 +377,6 @@ defRoom({
       return null;
     },
   },
-  bg(fb) {
-    A.sky(fb, 90, 81, 3);
-    A.mountains(fb, 90, 50, 21);
-    A.grass(fb, 112, 31);
-    // ravine on the right with a river far below
-    fb.poly([[170, 112], [320, 112], [320, 200], [176, 200]], 8);
-    fb.poly([[176, 118], [320, 118], [320, 200], [184, 200]], 0);
-    fb.dither(176, 118, 144, 30, 8, 0, 1);
-    A.water(fb, 190, 176, 130, 24, 7);
-    fb.line(170, 112, 184, 200, 7);
-    // bridge
-    fb.rect(170, 140, 150, 20, 6);
-    for (let x = 172; x < 320; x += 7) fb.vline(x, 140, 159, 0);
-    fb.rect(170, 132, 150, 2, 6); fb.hline(170, 319, 134, 0);
-    for (let x = 174; x < 320; x += 30) { fb.rect(x, 128, 3, 14, 6); fb.line(x + 1, 160, x + 12, 176, 6); }
-    A.dirt(fb, [[0, 150], [60, 140], [170, 140], [170, 160], [60, 162], [0, 172]], 5);
-    A.dirt(fb, [[120, 112], [140, 112], [120, 150], [96, 150]], 6);
-    A.tree(fb, 30, 124, 18, 31);
-    A.rock(fb, 90, 186, 9, 4); A.rock(fb, 140, 178, 5, 2);
-  },
-  anim(fb, t) { A.sparkle(fb, 190, 176, 130, 24, t, 7); },
   npcs: [{
     id: 'grobb', name: 'Grobb', names: ['troll', 'grobb', 'monster'], look: () => (G.flag('gotBeard') ? LOOKS.trollShorn : LOOKS.troll),
     x: 188, y: 152, dir: DIR.LEFT, visible: trollHere,
@@ -617,34 +478,12 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.wizard,
   id: 'wizard', name: "Wizard's Tower", outdoor: true, area: 'wild', arena: 'forest',
   minY: 132,
   blocks: [{ x: 116, y: 132, w: 30, h: 8 }, { x: 174, y: 132, w: 30, h: 8 }],
   exits: { left: leave('trollbridge', 300, 150, DIR.LEFT) },
   doors: [{ rect: { x: 148, y: 132, w: 24, h: 4 }, to: 'wizardin', at: [160, 188], dir: DIR.UP, names: ['door', 'tower'] }],
-  bg(fb) {
-    A.sky(fb, 110, 91, 2);
-    A.mountains(fb, 108, 60, 17);
-    A.grass(fb, 128, 33);
-    A.stoneWall(fb, 118, 12, 84, 122, 7, 8);
-    for (let y = 12; y < 134; y++) { fb.pset(118, y, 8); fb.pset(119, y, 8); fb.pset(200, y, 15); fb.pset(201, y, 15); }
-    fb.poly([[110, 14], [210, 14], [160, -40]], 1);
-    fb.line(110, 14, 160, -40, 9); fb.line(210, 14, 160, -40, 0);
-    for (let i = 0; i < 6; i++) fb.pset(140 + i * 8, 2 - (i % 2) * 4, 14);
-    A.archDoor(fb, 148, 134, 24, 34, 5);
-    fb.vline(160, 108, 133, 13);
-    fb.circle(160, 60, 6, 11); fb.circle(160, 60, 3, 1); fb.circle(142, 90, 4, 11); fb.circle(178, 90, 4, 11);
-    A.dirt(fb, [[148, 134], [172, 134], [180, 150], [0, 158], [0, 146], [140, 146]], 7);
-    A.flowers(fb, 200, 150, 110, 40, [9, 13, 11], 81, 40);
-  },
-  anim(fb, t) {
-    fb.map = null;
-    for (let i = 0; i < 3; i++) {
-      const y = 70 + Math.sin(t * 1.5 + i * 2) * 5, x = 60 + i * 90 + (i === 1 ? 150 : 0);
-      A.rock(fb, x % 320, y + 40, 6, 3);
-      fb.pset(x % 320, y + 48, 11);
-    }
-  },
   things: [
     { names: ['tower'], look: 'A tall tower of pale stone, crowned with a blue roof shaped like a wizard\'s hat. Rocks float lazily around it.' },
     { names: ['rock', 'rocks', 'floating'], look: 'Rocks drift through the air around the tower as if they were clouds. Nobody seems to find this odd but you.' },
@@ -671,31 +510,11 @@ function riddleAsk() {
 }
 
 defRoom({
+  ...SCENES.wizardin,
   id: 'wizardin', name: "Zephram's Study", outdoor: false, area: 'inside',
   minY: 134,
   blocks: [{ x: 214, y: 134, w: 60, h: 10 }],
   exits: { down: leave('wizard', 160, 144, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 1, wall2: 0, floor: 5, floor2: 1, wallH: 112, stone: true });
-    A.books(fb, 10, 12, 70, 6, 5);
-    A.books(fb, 250, 12, 64, 6, 9);
-    fb.rect(120, 20, 60, 50, 0); fb.frame(120, 20, 60, 50, 14);
-    const r = rng(3);
-    for (let i = 0; i < 25; i++) fb.pset(122 + r() * 56, 22 + r() * 46, r() < 0.3 ? 14 : 15);
-    fb.circle(160, 45, 6, 7); fb.circle(158, 43, 5, 0);
-    fb.line(96, 100, 110, 60, 6, 2); fb.line(110, 60, 118, 56, 7, 3);
-    fb.line(96, 100, 86, 112, 6); fb.line(96, 100, 104, 112, 6);
-  },
-  anim(fb, t) {
-    fb.map = null;
-    const y = 90 + Math.sin(t * 2) * 4;
-    fb.circle(200, y, 7, 3); fb.circle(200, y, 5, 11); fb.pset(198, y - 2, 15);
-    for (let i = 0; i < 4; i++) { const a = t * 2 + i * 1.57; fb.pset(200 + Math.cos(a) * 11, y + Math.sin(a) * 4, 13); }
-  },
-  props: [{ y: 144, draw(fb) {
-    A.table(fb, 214, 126, 60);
-    fb.rect(222, 118, 6, 8, 11); fb.rect(236, 116, 4, 10, 10); fb.rect(250, 120, 14, 6, 15); fb.line(250, 120, 264, 118, 8);
-  } }],
   npcs: [{
     id: 'zephram', name: 'Zephram', names: ['zephram', 'wizard', 'man', 'old man', 'mage'], look: LOOKS.wizard,
     x: 150, y: 150, dir: DIR.DOWN, act: 'stand',
@@ -778,6 +597,7 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.koboldcave,
   id: 'koboldcave', name: 'Cave Mouth', outdoor: true, area: 'wild', arena: 'forest',
   minY: 124,
   blocks: [{ x: 0, y: 124, w: 150, h: 6 }, { x: 214, y: 124, w: 106, h: 6 }, { x: 250, y: 176, w: 30, h: 8 }],
@@ -787,22 +607,6 @@ defRoom({
   },
   doors: [{ rect: { x: 158, y: 124, w: 50, h: 4 }, to: 'kobold', at: [160, 188], dir: DIR.UP, names: ['cave'] }],
   encounters: { chance: 0.3, day: ['goblin'], night: ['goblin', 'wolf'] },
-  bg(fb) {
-    A.sky(fb, 60, 101, 1);
-    fb.rect(0, 20, 320, 106, 8);
-    const r = rng(9);
-    for (let i = 0; i < 40; i++) A.rock(fb, r() * 320, 20 + r() * 100, 10 + r() * 20, 5 + r() * 8);
-    fb.poly([[0, 30], [60, 18], [120, 26], [200, 14], [260, 24], [320, 16], [320, 0], [0, 0]], 11, 9, 0);
-    fb.ellipse(184, 110, 36, 42, 0);
-    fb.rect(148, 110, 72, 16, 0);
-    fb.dither(150, 70, 70, 20, 0, 8, 2);
-    A.grass(fb, 124, 37);
-    fb.dither(0, 124, 320, 76, 2, 8, 2);
-    A.dirt(fb, [[160, 124], [210, 124], [220, 150], [320, 160], [320, 172], [200, 170], [0, 160], [0, 148], [150, 145]], 12);
-    for (let i = 0; i < 5; i++) { const x = 120 + i * 30; fb.line(x, 150 + (i % 2) * 20, x + 6, 152 + (i % 2) * 20, 15); fb.circle(x, 150 + (i % 2) * 20, 1, 15); }
-    fb.circle(90, 176, 4, 15); fb.pset(89, 176, 0); fb.pset(91, 176, 0);
-  },
-  props: [{ y: 184, draw(fb) { A.rock(fb, 265, 178, 18, 8); } }],
   things: [
     { names: ['cave', 'mouth', 'entrance'], look: 'A dark cave mouth yawns in the cliff face. A faint smell of sulfur drifts out.' },
     { names: ['bone', 'bones', 'skull'], look: 'Old bones, picked clean. Some of them belonged to people. Most of them, you hope, did not.' },
@@ -829,24 +633,11 @@ function koboldFight() {
 }
 
 defRoom({
+  ...SCENES.kobold,
   id: 'kobold', name: "Kobold's Lair", outdoor: false, area: 'cave', arena: 'cave',
   minY: 124,
   blocks: [{ x: 230, y: 144, w: 30, h: 8 }],
   exits: { down: leave('koboldcave', 184, 132, DIR.DOWN) },
-  bg(fb) {
-    A.caveWalls(fb, 41);
-    for (let i = 0; i < 5; i++) { const x = 40 + i * 12; fb.circle(x, 160 + (i % 2) * 4, 4, 14); fb.pset(x, 159 + (i % 2) * 4, 15); }
-    fb.rect(20, 150, 50, 22, 8); fb.speckle(20, 150, 50, 22, 14, 0.2, 3);
-  },
-  anim(fb, t) {
-    if (koboldAsleep()) {
-      fb.map = null;
-      const k = (t * 0.7) % 1;
-      fb.pset(170 + k * 8, 130 - k * 16, 15); fb.pset(171 + k * 8, 130 - k * 16, 15);
-      fb.pset(166 + ((k + 0.5) % 1) * 8, 134 - ((k + 0.5) % 1) * 16, 7);
-    }
-  },
-  props: [{ y: 150, draw(fb) { A.chest(fb, 245, 150, !!G.flag('chestOpen')); } }],
   npcs: [{
     id: 'skarn', name: 'the kobold', names: ['kobold', 'skarn', 'mage', 'monster', 'creature'], look: LOOKS.kobold,
     x: 160, y: 150, dir: DIR.DOWN, visible: () => !koboldDead(),
@@ -936,6 +727,7 @@ function openChest(how: string) {
 const gateOpen = () => !!G.flag('gateOpen');
 
 defRoom({
+  ...SCENES.fortressgate,
   id: 'fortressgate', name: 'Brigand Stockade', outdoor: true, area: 'wild', arena: 'forest',
   minY: 132,
   blocks: [{ x: 0, y: 132, w: 136, h: 4 }, { x: 184, y: 132, w: 136, h: 4 }],
@@ -945,26 +737,6 @@ defRoom({
     check: () => { if (gateOpen()) return true; G.say('The stockade gate is shut and locked. A heavy lock hangs on a chain.'); return false; },
   }],
   encounters: { chance: 0.35, day: ['brigand'], night: ['brigand'] },
-  bg(fb) {
-    A.sky(fb, 90, 111, 2);
-    forestBackdrop(fb, 111);
-    fb.rect(0, 0, 320, 14, 9);
-    A.grass(fb, 132, 43);
-    A.palisade(fb, 0, 134, 320, 72);
-    fb.rect(30, 20, 40, 40, 6); fb.poly([[26, 22], [74, 22], [50, 6]], 8); fb.rect(36, 30, 28, 12, 0);
-    for (let x = 30; x < 70; x += 6) fb.vline(x, 60, 134, 6);
-    fb.rect(136, 70, 48, 64, 6);
-    for (let x = 138; x < 184; x += 6) fb.vline(x, 70, 133, 0);
-    fb.hline(136, 183, 90, 8); fb.hline(136, 183, 116, 8);
-    fb.poly([[140, 30], [180, 30], [184, 70], [136, 70]], 0);
-    fb.poly([[152, 40], [168, 40], [160, 30]], 4);
-    fb.line(156, 50, 164, 58, 14); fb.line(164, 50, 156, 58, 14);
-    A.dirt(fb, [[136, 134], [184, 134], [210, 200], [110, 200]], 13);
-  },
-  props: [{ y: 134, draw(fb) {
-    if (gateOpen()) { fb.rect(136, 70, 48, 64, 0); fb.rect(128, 70, 8, 64, 6); fb.rect(184, 70, 8, 64, 6); }
-    else { fb.rect(156, 100, 8, 10, 7); fb.frame(156, 100, 8, 10, 8); fb.pset(160, 106, 0); fb.line(150, 98, 170, 98, 8); }
-  } }],
   things: [
     { names: ['gate', 'door'], look: () => gateOpen() ? 'The stockade gate stands open.' : 'A heavy gate of lashed logs, locked with a big iron padlock. Above it, crossed daggers are painted in yellow.' },
     { names: ['lock', 'padlock'], look: 'A big padlock, well oiled. Somebody takes care of it.' },
@@ -1036,27 +808,13 @@ function brigandPair() {
 }
 
 defRoom({
+  ...SCENES.courtyard,
   id: 'courtyard', name: 'Stockade Courtyard', outdoor: true, area: 'fortress', arena: 'fortress',
   minY: 128,
   blocks: [{ x: 140, y: 150, w: 40, h: 8 }],
   exits: { down: leave('fortressgate', 160, 146, DIR.DOWN) },
   doors: [{ rect: { x: 146, y: 128, w: 28, h: 4 }, to: 'hall', at: [160, 188], dir: DIR.UP, names: ['hall', 'door'],
     check: () => { if (G.flag('courtyardClear') || G.flag('snuck')) return true; G.say('The brigands are between you and the hall!'); return false; } }],
-  bg(fb) {
-    A.sky(fb, 60, 121, 1);
-    A.palisade(fb, 0, 72, 320, 60);
-    fb.rect(90, 40, 140, 90, 6);
-    for (let x = 90; x < 230; x += 7) fb.vline(x, 40, 129, 0);
-    fb.poly([[80, 42], [240, 42], [210, 12], [110, 12]], 8);
-    for (let y = 16; y < 42; y += 5) fb.hline(100 - (y - 16) * 0.8, 220 + (y - 16) * 0.8, y, 0);
-    fb.rect(146, 94, 28, 36, 0);
-    fb.poly([[20, 132], [60, 132], [40, 96]], 7); fb.line(40, 96, 40, 132, 8); fb.poly([[34, 132], [46, 132], [40, 116]], 0);
-    fb.poly([[260, 132], [300, 132], [280, 96]], 7); fb.line(280, 96, 280, 132, 8);
-    fb.rect(0, 128, 320, 72, 6); fb.dither(0, 128, 320, 72, 6, 8, 0);
-    fb.speckle(0, 128, 320, 72, 0, 0.03, 3);
-    fb.rect(100, 70, 12, 12, 4); fb.rect(208, 70, 12, 12, 4);
-  },
-  anim(fb, t) { fb.map = null; A.fire(fb, 160, 156, t, 0.9); for (let i = 0; i < 5; i++) fb.rect(144 + i * 8, 155, 6, 3, 6); },
   npcs: [
     { id: 'b1', name: 'a brigand', names: ['brigand', 'brigands', 'guard', 'guards', 'man', 'men'], look: LOOKS.brigand, x: 120, y: 160, dir: DIR.RIGHT,
       visible: () => !G.flag('courtyardClear'), act: 'stand',
@@ -1122,18 +880,10 @@ function throwDispel() {
 }
 
 defRoom({
+  ...SCENES.hall,
   id: 'hall', name: "Brigand Leader's Hall", outdoor: false, area: 'fortress', arena: 'fortress',
   minY: 128,
   exits: { down: leave('courtyard', 160, 140, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 6, wall2: 0, floor: 8, floor2: 0, wallH: 112 });
-    for (let x = 30; x < 320; x += 70) { fb.rect(x, 10, 22, 50, 4); fb.poly([[x, 60], [x + 22, 60], [x + 11, 70]], 4); fb.line(x + 6, 24, x + 16, 40, 14); fb.line(x + 16, 24, x + 6, 40, 14); }
-    fb.rect(140, 70, 40, 44, 6); fb.rect(144, 60, 32, 14, 6); fb.frame(144, 60, 32, 14, 14);
-    fb.ellipse(160, 160, 70, 20, 4, 12, 1);
-    A.barrel(fb, 30, 150); A.barrel(fb, 290, 150);
-    fb.rect(20, 40, 3, 16, 6); fb.rect(297, 40, 3, 16, 6);
-  },
-  anim(fb, t) { A.fire(fb, 21, 42, t, 0.4); A.fire(fb, 298, 42, t, 0.4); },
   npcs: [{
     id: 'leader', name: 'the Masked Leader', names: ['leader', 'brigand', 'woman', 'masked', 'mask', 'boss', 'wren'], look: LOOKS.leader,
     x: 160, y: 136, dir: DIR.DOWN, visible: () => !G.flag('leaderCured'),

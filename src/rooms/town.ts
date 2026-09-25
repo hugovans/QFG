@@ -1,8 +1,8 @@
 import { defRoom } from '../registry';
+import { SCENES } from './scenes';
 import { G } from '../game';
-import * as A from '../art';
 import { DIR, LOOKS } from '../sprites';
-import { buy, cobbles, leave, within } from './common';
+import { buy, leave, within } from './common';
 
 // ---------------------------------------------------------------------------------------
 // Outside the town walls
@@ -11,6 +11,7 @@ import { buy, cobbles, leave, within } from './common';
 const gateClosed = () => within(22, 6);
 
 defRoom({
+  ...SCENES.towngate,
   id: 'towngate', name: 'Thornwick Gate', outdoor: true, area: 'town', arena: 'forest',
   minY: 122,
   blocks: [{ x: 0, y: 122, w: 74, h: 5 }, { x: 116, y: 122, w: 104, h: 5 }, { x: 160, y: 141, w: 22, h: 5 }],
@@ -24,42 +25,6 @@ defRoom({
       return false;
     },
   }],
-  bg(fb) {
-    A.sky(fb, 100, 11, 3);
-    A.mountains(fb, 84, 40, 5);
-    A.hills(fb, 118, 22, 2);
-    A.stoneWall(fb, 0, 50, 220, 72);
-    A.crenels(fb, 0, 50, 220);
-    A.stoneWall(fb, 48, 32, 28, 90); A.crenels(fb, 48, 32, 28); fb.rect(60, 50, 3, 10, 0);
-    A.stoneWall(fb, 114, 32, 28, 90); A.crenels(fb, 114, 32, 28); fb.rect(126, 50, 3, 10, 0);
-    A.stoneWall(fb, 196, 28, 30, 94); A.crenels(fb, 196, 28, 30); fb.rect(209, 48, 3, 10, 0);
-    A.archDoor(fb, 76, 122, 38, 56, 0);
-    fb.dither(78, 96, 34, 26, 6, 8);
-    for (let x = 79; x < 112; x += 5) fb.vline(x, 66, 74, 8);
-    fb.hline(78, 111, 66, 8);
-    // banner
-    fb.rect(58, 18, 1, 14, 6); fb.poly([[59, 18], [70, 20], [59, 24]], 4);
-    A.grass(fb, 122, 4);
-    A.dirt(fb, [[76, 122], [114, 122], [150, 145], [320, 158], [320, 186], [150, 176], [100, 190], [95, 200], [40, 200], [70, 150]], 4);
-    A.dirt(fb, [[232, 122], [270, 122], [262, 150], [226, 150]], 5);
-    A.bush(fb, 20, 160, 22, 3); A.bush(fb, 300, 140, 16, 9);
-    A.rock(fb, 250, 185, 10, 4);
-    A.flowers(fb, 170, 180, 60, 16, [14, 15], 3, 20);
-  },
-  props: [{
-    y: 145, draw(fb) {
-      fb.rect(162, 120, 2, 26, 6); fb.rect(179, 120, 2, 26, 6);
-      fb.rect(159, 118, 25, 16, 6); fb.frame(159, 118, 25, 16, 0);
-      fb.rect(162, 121, 8, 6, 15); fb.rect(172, 122, 8, 9, 15); fb.rect(163, 128, 7, 4, 7);
-    },
-  }],
-  anim(fb) {
-    if (gateClosed()) {
-      fb.rect(78, 70, 34, 52, 6);
-      for (let x = 82; x < 110; x += 6) fb.vline(x, 70, 121, 8);
-      fb.hline(78, 111, 84, 0); fb.hline(78, 111, 108, 0);
-    }
-  },
   things: [
     { names: ['board', 'notice', 'poster', 'sign'], look: 'A notice nailed to the board reads:\n\n"HEROES WANTED. The valley of Thornwick needs brave souls. Brigands, monsters, and worse. Inquire at the Adventurers\' Guild on Main Street."\n\nSomeone has scrawled underneath: "good luck"' },
     { names: ['wall', 'walls', 'tower', 'towers'], look: 'The old stone walls of Thornwick have kept out worse than brigands. Mostly.' },
@@ -102,9 +67,9 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 const shopOpen = () => within(8, 20);
-let streetLights: A.Window[] = [];
 
 defRoom({
+  ...SCENES.mainstreet,
   id: 'mainstreet', name: 'Main Street', outdoor: true, area: 'town', arena: 'forest',
   minY: 122,
   blocks: [{ x: 141, y: 164, w: 38, h: 11 }],
@@ -115,32 +80,6 @@ defRoom({
     { rect: { x: 151, y: 122, w: 18, h: 4 }, to: 'inn', at: [160, 188], dir: DIR.UP, names: ['inn', 'tavern'] },
     { rect: { x: 253, y: 122, w: 18, h: 4 }, to: 'guild', at: [160, 188], dir: DIR.UP, names: ['guild'] },
   ],
-  bg(fb) {
-    A.sky(fb, 70, 21, 2);
-    A.mountains(fb, 60, 22, 8);
-    const w1 = A.house(fb, 8, 122, 88, 56, { roof: 6, door: 34, windows: [8, 64], sign: 58 });
-    const w2 = A.house(fb, 104, 122, 112, 70, { roof: 4, door: 47, windows: [10, 88], sign: 70 });
-    const w3 = A.house(fb, 224, 122, 76, 62, { roof: 8, stone: true, door: 29, windows: [6, 56] });
-    streetLights = [...w1, ...w2, ...w3];
-    // signs: shop (a loaf), inn (a goose), guild (crossed swords)
-    fb.ellipse(76, 71, 5, 3, 14);
-    fb.circle(181, 58, 3, 15); fb.rect(179, 60, 8, 3, 15); fb.pset(184, 57, 14);
-    fb.line(254, 64, 268, 76, 15); fb.line(268, 64, 254, 76, 15);
-    fb.rect(301, 30, 19, 92, 0); fb.dither(301, 30, 19, 92, 0, 8, 2);
-    cobbles(fb, 122);
-  },
-  get lights() { return streetLights; },
-  props: [{
-    y: 172, draw(fb) {
-      fb.ellipse(160, 172, 19, 5, 8);
-      fb.rect(141, 164, 38, 9, 7);
-      A.stoneWall(fb, 141, 164, 38, 9);
-      fb.ellipse(160, 164, 18, 4, 1);
-      fb.rect(143, 140, 3, 25, 6); fb.rect(174, 140, 3, 25, 6);
-      fb.poly([[138, 142], [182, 142], [170, 132], [150, 132]], 4);
-      fb.hline(146, 174, 147, 6); fb.vline(160, 147, 156, 8); fb.rect(157, 156, 6, 5, 6);
-    },
-  }],
   npcs: [{
     id: 'sheriff', name: 'Sheriff Bram', names: ['sheriff', 'bram', 'man', 'lawman'], look: LOOKS.sheriff,
     x: 90, y: 150, dir: DIR.DOWN, wander: [50, 280], visible: () => within(8, 20),
@@ -180,29 +119,10 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.shop,
   id: 'shop', name: "Greta's General Store", outdoor: false, area: 'inside',
   minY: 140,
   exits: { down: leave('mainstreet', 51, 130, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 6, wall2: 8, floor: 6, floor2: 0, wallH: 112 });
-    A.shelves(fb, 14, 20, 110, 5, 3);
-    A.shelves(fb, 180, 10, 126, 4, 7);
-    fb.rect(140, 20, 30, 40, 11); fb.frame(140, 20, 30, 40, 6); fb.vline(155, 20, 59, 6); fb.hline(140, 169, 40, 6);
-    A.barrel(fb, 30, 150); A.barrel(fb, 48, 158);
-    fb.ellipse(22, 176, 12, 8, 7); fb.ellipse(22, 170, 9, 3, 14);
-    fb.rect(260, 70, 3, 40, 6); fb.hline(250, 272, 70, 6);
-    for (let i = 0; i < 4; i++) fb.rect(252 + i * 5, 72, 3, 8 + i * 2, [4, 2, 14, 12][i]);
-  },
-  props: [{
-    y: 136, draw(fb) {
-      fb.rect(150, 108, 170, 28, 6);
-      fb.rect(150, 106, 170, 4, 14);
-      for (let x = 158; x < 320; x += 22) fb.vline(x, 110, 135, 8);
-      fb.hline(150, 319, 135, 0);
-      fb.rect(200, 98, 16, 8, 7); fb.ellipse(208, 98, 8, 2, 8);
-      fb.rect(280, 100, 6, 6, 14);
-    },
-  }],
   npcs: [{
     id: 'greta', name: 'Greta', names: ['greta', 'woman', 'shopkeeper', 'keeper', 'lady', 'owner'], look: LOOKS.shopkeep,
     x: 240, y: 118, dir: DIR.DOWN,
@@ -249,34 +169,11 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.inn,
   id: 'inn', name: 'The Hanged Goose', outdoor: false, area: 'inside',
   minY: 138,
   blocks: [{ x: 120, y: 150, w: 44, h: 8 }, { x: 196, y: 168, w: 44, h: 8 }, { x: 240, y: 138, w: 60, h: 6 }],
   exits: { down: leave('mainstreet', 160, 130, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 6, wall2: 0, floor: 6, floor2: 8, wallH: 116 });
-    for (let x = 0; x < 320; x += 40) fb.rect(x, 0, 5, 116, 8);
-    fb.rect(0, 12, 320, 5, 8);
-    A.fireplace(fb, 270, 116);
-    A.shelves(fb, 14, 24, 88, 3, 11);
-    fb.rect(150, 30, 40, 26, 6); fb.frame(150, 30, 40, 26, 14);
-    fb.circle(166, 42, 5, 15); fb.rect(165, 46, 10, 4, 15); fb.pset(162, 41, 14);
-    fb.rect(210, 40, 28, 18, 11); fb.frame(210, 40, 28, 18, 6); fb.vline(224, 40, 57, 6);
-  },
-  anim(fb, t) { A.fire(fb, 270, 114, t); },
-  props: [
-    {
-      y: 136, draw(fb) {
-        fb.rect(0, 104, 112, 32, 6); fb.rect(0, 102, 112, 4, 14);
-        for (let x = 8; x < 112; x += 18) fb.vline(x, 106, 135, 8);
-        fb.hline(0, 111, 135, 0);
-        fb.rect(20, 94, 6, 8, 7); fb.rect(60, 96, 5, 6, 14); fb.rect(90, 95, 7, 7, 6);
-        A.barrel(fb, 101, 102);
-      },
-    },
-    { y: 152, draw(fb) { A.table(fb, 120, 138, 44); fb.rect(128, 134, 5, 4, 14); fb.rect(150, 135, 6, 3, 7); } },
-    { y: 172, draw(fb) { A.table(fb, 196, 156, 44); fb.rect(212, 152, 6, 4, 6); } },
-  ],
   npcs: [
     {
       id: 'oswin', name: 'Oswin', names: ['oswin', 'innkeeper', 'keeper', 'bartender', 'barkeep', 'man', 'landlord'], look: LOOKS.innkeep,
@@ -359,29 +256,11 @@ function innSleep() {
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.guild,
   id: 'guild', name: "Adventurers' Guild", outdoor: false, area: 'inside',
   minY: 136,
   blocks: [{ x: 48, y: 136, w: 26, h: 10 }],
   exits: { down: leave('mainstreet', 262, 130, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 7, wall2: 8, floor: 8, floor2: 0, wallH: 112, stone: true });
-    // quest board
-    fb.rect(120, 22, 70, 50, 6); fb.frame(120, 22, 70, 50, 0);
-    [[126, 28, 18, 16], [148, 26, 14, 20], [166, 30, 18, 14], [128, 50, 20, 16], [154, 50, 26, 16]].forEach(([x, y, w, h]) => {
-      fb.rect(x, y, w, h, 15); for (let yy = y + 3; yy < y + h - 2; yy += 3) fb.hline(x + 2, x + w - 3, yy, 8); fb.pset(x + w / 2, y + 1, 4);
-    });
-    // trophies
-    fb.rect(28, 30, 22, 18, 6); fb.circle(39, 40, 7, 2); fb.poly([[33, 36], [30, 28], [36, 34]], 2); fb.poly([[45, 36], [48, 28], [42, 34]], 2); fb.pset(36, 39, 4); fb.pset(42, 39, 4);
-    fb.rect(62, 26, 26, 22, 6); fb.ellipse(75, 38, 9, 7, 8); fb.rect(78, 38, 9, 4, 8); fb.pset(72, 35, 14); fb.poly([[68, 32], [70, 24], [73, 32]], 7);
-    fb.line(220, 30, 250, 60, 7, 2); fb.line(250, 30, 220, 60, 7, 2); fb.circle(235, 45, 9, 4); fb.circle(235, 45, 6, 14); fb.circle(235, 45, 3, 4);
-    A.fireplace(fb, 285, 112);
-    fb.rect(100, 90, 110, 8, 4); fb.hline(100, 209, 90, 14);
-  },
-  anim(fb, t) { A.fire(fb, 285, 110, t); },
-  props: [{ y: 146, draw(fb) {
-    fb.rect(58, 120, 6, 26, 6); fb.poly([[48, 112], [74, 112], [70, 122], [52, 122]], 6);
-    fb.rect(52, 108, 18, 6, 15); fb.vline(61, 108, 113, 8); for (let x = 54; x < 69; x += 3) fb.pset(x, 110, 8);
-  } }],
   npcs: [{
     id: 'harrow', name: 'Captain Harrow', names: ['harrow', 'captain', 'guildmaster', 'master', 'man', 'old man'], look: LOOKS.guildmaster,
     x: 240, y: 152, dir: DIR.LEFT,
@@ -439,6 +318,7 @@ defRoom({
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.alley,
   id: 'alley', name: 'Back Alley', outdoor: true, area: 'town', arena: 'forest',
   minY: 128,
   blocks: [{ x: 128, y: 146, w: 36, h: 10 }],
@@ -449,25 +329,6 @@ defRoom({
     { rect: { x: 222, y: 128, w: 20, h: 4 }, to: 'merchant', at: [160, 188], dir: DIR.UP, names: ['merchant door', 'back door'],
       check: () => { if (G.flag('merchantOpen') && within(21, 5)) return true; G.say(G.isNight ? 'The merchant\'s back door is locked.' : 'The back door of Fenwick the merchant\'s house. Locked, of course.'); return false; } },
   ],
-  bg(fb) {
-    fb.rect(0, 0, 320, 128, 0);
-    fb.dither(110, 0, 100, 30, 1, 0, 1);
-    A.stoneWall(fb, 0, 10, 120, 118, 4, 6);
-    A.stoneWall(fb, 200, 16, 120, 112, 4, 6);
-    A.stoneWall(fb, 120, 40, 80, 88, 8, 0);
-    fb.rect(58, 96, 24, 32, 0); fb.rect(60, 98, 20, 30, 8); fb.rect(66, 106, 8, 4, 6); fb.pset(76, 114, 7);
-    A.door(fb, 222, 128, 20, 30, 6);
-    fb.rect(30, 40, 16, 14, 0); fb.rect(250, 44, 16, 14, 0);
-    cobbles(fb, 128);
-    fb.dither(0, 128, 320, 72, 8, 7, 2);
-    fb.rect(10, 150, 26, 18, 8); fb.ellipse(23, 150, 13, 3, 7);
-  },
-  get lights() { return [{ x: 32, y: 42, w: 12, h: 10 }]; },
-  props: [{ y: 156, draw(fb) {
-    fb.rect(128, 132, 22, 22, 6); fb.frame(128, 132, 22, 22, 0); fb.line(128, 132, 149, 153, 8);
-    fb.rect(146, 140, 18, 16, 6); fb.frame(146, 140, 18, 16, 0);
-    fb.rect(132, 118, 16, 14, 6); fb.frame(132, 118, 16, 14, 0);
-  } }],
   things: [
     { names: ['black door', 'door', 'peephole'], look: 'A black door with a shuttered peephole. No handle on the outside.' },
     { names: ['merchant door', 'back door', 'green door'], look: "The back door of Fenwick the merchant's house. It has a sturdy lock." },
@@ -532,19 +393,11 @@ defRoom({
 });
 
 defRoom({
+  ...SCENES.thieves,
   id: 'thieves', name: "Thieves' Guild", outdoor: false, area: 'inside',
   minY: 138,
   blocks: [{ x: 128, y: 138, w: 64, h: 8 }],
   exits: { down: leave('alley', 70, 140, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 8, wall2: 0, floor: 8, floor2: 0, wallH: 114, stone: true });
-    fb.rect(40, 30, 50, 34, 5); fb.frame(40, 30, 50, 34, 14); fb.line(46, 36, 84, 58, 14); fb.line(84, 36, 46, 58, 14);
-    fb.rect(230, 20, 60, 70, 6); for (let y = 26; y < 90; y += 16) { fb.hline(230, 289, y, 0); for (let x = 234; x < 286; x += 9) fb.rect(x, y + 3, 5, 9, [14, 7, 6, 15][(x + y) % 4]); }
-  },
-  anim(fb, t) {
-    for (const x of [132, 188]) { fb.rect(x - 1, 124, 3, 6, 15); fb.pset(x, 121 - (Math.floor(t * 8) % 2), 14); fb.pset(x, 122, 12); }
-  },
-  props: [{ y: 146, draw(fb) { A.table(fb, 128, 128, 64); fb.rect(150, 124, 20, 4, 14); for (let i = 0; i < 5; i++) fb.circle(145 + i * 6, 126, 1, 14); } }],
   npcs: [{
     id: 'nell', name: 'Nimble Nell', names: ['nell', 'woman', 'thief', 'chief', 'boss', 'leader'], look: LOOKS.thiefBoss,
     x: 160, y: 134, dir: DIR.DOWN,
@@ -593,23 +446,11 @@ defRoom({
 });
 
 defRoom({
+  ...SCENES.merchant,
   id: 'merchant', name: "Fenwick's Parlor", outdoor: false, area: 'inside',
   minY: 136,
   blocks: [{ x: 196, y: 138, w: 70, h: 10 }],
   exits: { down: leave('alley', 232, 140, DIR.DOWN) },
-  bg(fb) {
-    A.room(fb, { wall: 1, wall2: 9, floor: 6, floor2: 8, wallH: 112 });
-    fb.rect(40, 24, 40, 50, 6); fb.frame(40, 24, 40, 50, 14); fb.ellipse(60, 44, 10, 12, 12); fb.rect(52, 54, 16, 18, 4); fb.pset(57, 42, 0); fb.pset(63, 42, 0);
-    fb.rect(120, 40, 34, 44, 3); fb.frame(120, 40, 34, 44, 6);
-    fb.ellipse(130, 170, 70, 18, 4); fb.ellipse(130, 170, 60, 14, 12, 4, 0);
-    A.books(fb, 270, 20, 44, 5, 3);
-  },
-  anim(fb) { fb.dither(0, 0, 320, 200, T0, 0, 1); },
-  props: [{ y: 148, draw(fb) {
-    fb.rect(196, 118, 70, 28, 6); fb.hline(196, 265, 118, 14); fb.frame(196, 118, 70, 28, 0);
-    fb.rect(206, 126, 20, 8, 8); fb.pset(216, 130, 14);
-    fb.rect(240, 110, 8, 8, 7); fb.pset(244, 107, 14);
-  } }],
   things: [
     { names: ['desk', 'drawer'], look: () => G.flag('burgled') ? 'The desk drawer hangs open, empty.' : 'A heavy oak desk with a single drawer.' },
     { names: ['portrait', 'painting'], look: 'A portrait of Fenwick the merchant, looking pleased with himself.' },
@@ -631,33 +472,17 @@ defRoom({
     return false;
   },
 });
-const T0 = 255;
 
 // ---------------------------------------------------------------------------------------
 // Castle Thornwick
 // ---------------------------------------------------------------------------------------
 
 defRoom({
+  ...SCENES.castlegate,
   id: 'castlegate', name: 'Castle Thornwick', outdoor: true, area: 'castle', arena: 'forest',
   minY: 130,
   blocks: [{ x: 0, y: 130, w: 320, h: 4 }],
   exits: { down: leave('towngate', 250, 128, DIR.DOWN), right: 'northwood' },
-  bg(fb) {
-    A.sky(fb, 110, 31, 2);
-    A.mountains(fb, 70, 40, 12);
-    A.stoneWall(fb, 20, 40, 280, 92);
-    A.crenels(fb, 20, 40, 280);
-    for (const x of [8, 272]) { A.stoneWall(fb, x, 14, 40, 118); A.crenels(fb, x, 14, 40); fb.rect(x + 18, 40, 3, 12, 0); fb.rect(x + 18, 80, 3, 12, 0); fb.poly([[x - 2, 14], [x + 42, 14], [x + 20, -8]], 4); }
-    fb.rect(140, 10, 40, 30, 7); A.stoneWall(fb, 140, 10, 40, 30); fb.poly([[136, 10], [184, 10], [160, -14]], 4);
-    A.archDoor(fb, 138, 132, 44, 60, 0);
-    for (let x = 140; x < 182; x += 5) fb.vline(x, 76, 131, 8);
-    for (let y = 80; y < 132; y += 8) fb.hline(139, 181, y, 8);
-    fb.rect(90, 58, 2, 16, 6); fb.poly([[92, 58], [104, 61], [92, 66]], 5);
-    fb.rect(228, 58, 2, 16, 6); fb.poly([[230, 58], [242, 61], [230, 66]], 5);
-    A.grass(fb, 132, 21);
-    A.dirt(fb, [[140, 132], [180, 132], [262, 200], [226, 200]], 3);
-    A.bush(fb, 40, 180, 20, 2); A.bush(fb, 300, 170, 18, 4);
-  },
   npcs: [
     {
       id: 'pike', name: 'Sergeant Pike', names: ['pike', 'guard', 'sergeant', 'soldier', 'man'], look: LOOKS.castleGuard,

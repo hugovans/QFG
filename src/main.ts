@@ -4,6 +4,10 @@ import { G } from './game';
 import { AUDIO } from './audio';
 import * as UI from './ui';
 import { ROOMS } from './registry';
+import { loadBackgrounds } from './backgrounds';
+import { LOOKS, Look, portrait } from './sprites';
+import { FB } from './gfx';
+import { T } from './palette';
 import {
   BONUS_POINTS, CLASSES, ClassDef, ITEMS, MAX_SCORE, SKILL_NAMES, SPELLS, STAT_NAMES, Skill, Stat, maxHP, maxMP, maxSP, newHero,
 } from './state';
@@ -314,9 +318,43 @@ function frame(now: number) {
   requestAnimationFrame(frame);
 }
 
+// ---- dialogue portraits ----------------------------------------------------------------
+
+const EXTRA_SPEAKERS: Record<string, Look> = {
+  'Masked Leader': LOOKS.leader, Brigand: LOOKS.brigand, Grobb: LOOKS.troll, Skarn: LOOKS.kobold,
+};
+const portraitCache = new Map<string, string | null>();
+
+function fbToDataURL(fb: FB) {
+  const c = document.createElement('canvas');
+  c.width = fb.w; c.height = fb.h;
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(fb.w, fb.h);
+  for (let i = 0; i < fb.px.length; i++) {
+    const v = fb.px[i];
+    img.data[i * 4] = (v >> 16) & 255; img.data[i * 4 + 1] = (v >> 8) & 255; img.data[i * 4 + 2] = v & 255;
+    img.data[i * 4 + 3] = v === T ? 0 : 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL();
+}
+
+UI.setPortraitProvider((who) => {
+  if (portraitCache.has(who)) return portraitCache.get(who)!;
+  let look: Look | null = EXTRA_SPEAKERS[who] ?? null;
+  if (!look)
+    for (const r of Object.values(ROOMS))
+      for (const n of r.npcs ?? []) if (n.name.replace(/^the /, '') === who.replace(/^the /, '')) look = typeof n.look === 'function' ? n.look() : n.look;
+  const url = look && !look.kind ? fbToDataURL(portrait(look)) : null;
+  portraitCache.set(who, url);
+  return url;
+});
+
 if (!ROOMS[G.titleRoom]) throw new Error('title room missing');
-showTitle();
-requestAnimationFrame(frame);
+loadBackgrounds().finally(() => {
+  showTitle();
+  requestAnimationFrame(frame);
+});
 
 // Debug handle for the browser console: __thornwick.G.go('meadow', 160, 160)
 (window as any).__thornwick = { G, ROOMS, UI };

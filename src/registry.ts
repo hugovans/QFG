@@ -40,10 +40,17 @@ export interface Door {
   check?: () => boolean;
 }
 
+/**
+ * Scenery the hero can walk behind. It is drawn once into a transparent layer (cached by
+ * `key`) and composited by depth. With a painted background, the layer is only used as a
+ * mask and the pixels come from the painting.
+ */
 export interface Prop {
   y: number;
-  draw: (fb: FB, t: number) => void;
+  draw: (fb: FB) => void;
   visible?: () => boolean;
+  /** Changes when the prop's appearance changes (e.g. a door opening). */
+  key?: () => string;
 }
 
 export type Side = 'left' | 'right' | 'up' | 'down';
@@ -65,7 +72,10 @@ export interface Room {
   props?: Prop[];
   lights?: Window[];
   bg: (fb: FB) => void;
+  /** Animated scenery drawn over the background each frame (before time-of-day grading). */
   anim?: (fb: FB, t: number) => void;
+  /** Light sources and emissive details drawn after grading, so they stay bright at night. */
+  glow?: (fb: FB, t: number, dark: boolean) => void;
   desc: string | (() => string);
   enter?: (first: boolean) => void;
   tick?: (dt: number) => void;

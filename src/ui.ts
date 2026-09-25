@@ -8,8 +8,11 @@ const queue: Msg[] = [];
 let current: Msg | null = null;
 let openedAt = 0;
 let onOpen: (() => void) | null = null;
+let portraitOf: ((who: string) => string | null) | null = null;
 
 export function setOnMessageOpen(fn: () => void) { onOpen = fn; }
+/** Supplies a portrait image (data URL) for a speaker's name, if there is one. */
+export function setPortraitProvider(fn: (who: string) => string | null) { portraitOf = fn; }
 
 export function say(text: string, who?: string, then?: () => void) {
   queue.push({ text, who, then });
@@ -24,6 +27,10 @@ function next() {
   openedAt = performance.now();
   $('msg-who').textContent = m.who ?? '';
   $('msg-who').hidden = !m.who;
+  const pic = m.who && portraitOf ? portraitOf(m.who) : null;
+  const img = $<HTMLImageElement>('msg-portrait');
+  img.hidden = !pic;
+  if (pic) { img.src = pic; img.alt = m.who ?? ''; }
   $('msg-text').innerHTML = esc(m.text).replace(/\n/g, '<br>');
   box.hidden = false;
   onOpen?.();

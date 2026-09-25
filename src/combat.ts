@@ -1,5 +1,5 @@
-import { FB } from './gfx';
-import { FLASH, GLOW, GREY } from './palette';
+import { FB, drawNumber, fbm, noise } from './gfx';
+import { Col, RAMP, T, fxFlash, fxGlow, fxGrey, fxHurt, gradeNight, mix, rampAt } from './palette';
 import { sprite } from './sprites';
 import type { MonsterDef } from './monsters';
 import { G } from './game';
@@ -142,6 +142,7 @@ export class Combat {
   }
 
   update(dt: number) {
+    this.tickFx(dt);
     if (this.mflash > 0) this.mflash -= dt;
     if (this.hflash > 0) this.hflash -= dt;
     if (this.outcome) {
@@ -217,6 +218,8 @@ export class Combat {
     this.mhp -= n;
     this.mflash = 0.15;
     AUDIO.sfx('hit');
+    this.burst(200, 120, 0xfff0a0, 12);
+    this.popNumber(214, 70, String(n), 0xffe060);
     if (this.mhp <= 0) {
       this.mhp = 0;
       this.ms = 'dead';
@@ -243,6 +246,7 @@ export class Combat {
         if (ranged) v -= 25;
         if (G.roll(v, 30)) {
           AUDIO.sfx('block');
+          this.burst(140, 112, 0xe8f0ff, 14);
           this.log(G.has('shield') ? 'Your shield takes the blow!' : 'You parry the blow!');
           G.train('parry');
           return;
@@ -258,7 +262,10 @@ export class Combat {
     const dmg = Math.max(1, rand(this.def.dmg[0], this.def.dmg[1]) - (G.has('leather') ? 2 : 0));
     h.hp -= dmg;
     this.hflash = 0.2;
+    this.shake = 0.22;
     AUDIO.sfx('hurt');
+    this.burst(122, 120, 0xff5040, 10);
+    this.popNumber(108, 76, '-' + dmg, 0xff7060);
     this.log(ranged ? `The fireball burns you! (${dmg})` : `The ${this.def.name} hits you! (${dmg})`);
     G.updateHUD();
     if (h.hp <= 0) {
@@ -267,79 +274,135 @@ export class Combat {
     }
   }
 
-  // ---- drawing ---------------------------------------------------------------------
+  // ---- effects -------------------------------------------------------------------------
+
+  sparks: { x: number; y: number; vx: number; vy: number; life: number; c: Col }[] = [];
+  numbers: { x: number; y: number; text: string; life: number; c: Col }[] = [];
+  shake = 0;
+
+  burst(x: number, y: number, c: Col, n = 10) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = 30 + Math.random() * 70;
+      this.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 30, life: 0.3 + Math.random() * 0.3, c });
+    }
+  }
+
+  popNumber(x: number, y: number, text: string, c: Col) { this.numbers.push({ x, y, text, life: 0.9, c }); }
+
+  tickFx(dt: number) {
+    for (const p of this.sparks) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 220 * dt; p.life -= dt; }
+    this.sparks = this.sparks.filter((p) => p.life > 0);
+    for (const n of this.numbers) { n.y -= 22 * dt; n.life -= dt; }
+    this.numbers = this.numbers.filter((n) => n.life > 0);
+    if (this.shake > 0) this.shake -= dt;
+  }
+
+  // ---- drawing ---------------------------------------------------------------------------
+
+  night = false;
 
   drawArena(kind: string) {
     const fb = this.bg;
     fb.clear(0);
-    if (kind === 'cave') { art.caveWalls(fb, 5); return; }
+    this.night = kind !== 'cave' && kind !== 'fortress' && G.isNight;
+    if (kind === 'cave') {
+      art.caveWalls(fb, 5);
+      art.vignette(fb, 0.9);
+      return;
+    }
     if (kind === 'fortress') {
-      art.stoneWall(fb, 0, 0, 320, 118, 8, 0);
-      for (const x of [60, 260]) { fb.rect(x - 2, 40, 4, 16, 6); art.fire(fb, x, 42, 0.3, 0.5); }
-      fb.rect(0, 118, 320, 82, 7);
-      for (let y = 118; y < 200; y += 10) fb.hline(0, 319, y, 8);
-      for (let y = 118, r = 0; y < 200; y += 10, r++) for (let x = r % 2 ? 0 : 20; x < 320; x += 40) fb.vline(x, y, y + 9, 8);
+      art.room(fb, { wall: 'wood', floor: 'stone', wallH: 116, seed: 13 });
+      for (let x = 20; x < 320; x += 76) {
+        fb.fill(x, 12, 26, 56, (px, py) => rampAt(RAMP.clothRed, 0.45 + (noise(px * 0.4, py * 0.05, x) - 0.5) * 0.4, px, py));
+        fb.limb(x + 6, 24, x + 20, 48, 1, 0.5, RAMP.clothYellow); fb.limb(x + 20, 24, x + 6, 48, 1, 0.5, RAMP.clothYellow);
+      }
+      art.vignette(fb, 0.7);
       return;
     }
-    art.sky(fb, 100, 3, 2);
-    art.mountains(fb, 88, 30, 9);
+    art.sky(fb, 92, 3, 3);
+    art.mountains(fb, 84, 44, 9, 0);
     if (kind === 'bridge') {
-      art.water(fb, 0, 96, 320, 24, 2);
-      fb.rect(0, 120, 320, 80, 6);
-      for (let x = 0; x < 320; x += 9) fb.vline(x, 120, 199, 0);
-      fb.rect(0, 112, 320, 3, 6); fb.hline(0, 319, 115, 0);
-      for (let x = 10; x < 320; x += 40) fb.rect(x, 104, 4, 16, 6);
+      art.mountains(fb, 100, 24, 19, 1);
+      art.water(fb, 0, 100, 320, 30, 2);
+      fb.fill(0, 118, 320, 82, (x, y) => {
+        const d = (y - 118) / 82, plank = Math.floor((x - 160) / (8 + d * 18) + 100);
+        return rampAt(RAMP.woodPale, 0.35 + d * 0.3 + (Math.abs(((x - 160) / (8 + d * 18)) % 1) < 0.08 ? -0.45 : 0) + ((plank * 7) % 5) / 25 + (noise(x * 0.2, y * 0.5, 3) - 0.5) * 0.2, x, y);
+      });
+      for (let x = 10; x < 320; x += 44) fb.limb(x, 124, x, 100, 2, 1.8, RAMP.wood);
+      fb.limb(0, 104, 320, 104, 1, 1, RAMP.clothBrown);
       return;
     }
-    art.hills(fb, 108, 20, 4, 2, 0);
-    for (let i = 0; i < 9; i++) art.tree(fb, 10 + i * 38, 108, 14, 40 + i, 'pine');
+    art.hills(fb, 104, 18, 4, RAMP.grass, 0.55);
+    art.treeline(fb, 108, 22, 7, RAMP.leafDark, 0.3);
     art.grass(fb, 108, 12);
-    art.tree(fb, 12, 150, 26, 5);
-    art.tree(fb, 305, 145, 24, 6);
+    fb.fill(0, 140, 320, 60, (x, y) => (fbm(x * 0.03, y * 0.08, 8) > 0.58 ? rampAt(RAMP.dirt, 0.5 + (noise(x, y, 2) - 0.5) * 0.3, x, y) : T));
+    art.tree(fb, 8, 170, 34, 5);
+    art.tree(fb, 312, 160, 30, 6);
+    art.bush(fb, 60, 118, 18, 3); art.bush(fb, 270, 120, 16, 4);
   }
 
   render(fb: FB, t: number) {
-    fb.map = null;
     fb.copyFrom(this.bg);
     const h = G.hero;
+    const S = 2.3;
+    const ground = 186;
     const heroAct = ({ ready: 'ready', attack: 'attack', parry: 'parry', dodge: 'ready', cast: 'cast', hurt: 'ready' } as const)[this.hs];
-    let hx = 110;
-    if (this.hs === 'dodge') hx -= 18;
-    if (this.hs === 'attack') hx += this.ht > this.hitAt ? 6 : 16;
-    fb.blit(sprite(G.heroLook, 3, 0, heroAct), hx, 182, { scale: 2, map: this.hflash > 0 ? FLASH : null });
-    if (this.zap && Math.floor(t * 12) % 2 === 0) for (let i = 0; i < 5; i++) fb.pset(hx + 30 + Math.random() * 14, 120 + Math.random() * 20, 11);
+    let hx = 106;
+    if (this.hs === 'dodge') hx -= 20;
+    if (this.hs === 'attack') hx += this.ht > this.hitAt ? 6 : 18;
 
     const L = this.def.look;
     const beast = !!L.kind && L.kind !== 'human';
     const mAct = this.ms === 'windup' ? 'windup' : this.ms === 'strike' ? 'attack' : this.ms === 'dead' ? 'dead' : beast ? 'stand' : 'ready';
-    let mx = 214;
-    if (this.ms === 'strike' && !this.def.ranged) mx -= beast ? 26 : 16;
+    let mx = 220;
+    if (this.ms === 'strike' && !this.def.ranged) mx -= beast ? 28 : 18;
     const tell = this.ms === 'windup' && this.mt < this.def.windup * 0.55 && Math.floor(t * 16) % 2 === 0;
-    const m = this.mflash > 0 ? FLASH : this.ms === 'calm' ? GREY : tell ? GLOW : null;
-    fb.blit(sprite(L, 2, 0, mAct), mx, 182, { scale: 2, map: m });
+    const mfx = this.mflash > 0 ? fxFlash : this.ms === 'calm' ? fxGrey : tell ? fxGlow : null;
+
+    fb.shadow(hx + 4, ground, 22, 5, 0.5);
+    fb.shadow(mx, ground, beast ? 34 : 24 * (L.scale ?? 1), 5, 0.5);
+    fb.blit(sprite(G.heroLook, 3, 0, heroAct, S), hx, ground, { fx: this.hflash > 0 ? fxHurt : null });
+    fb.blit(sprite(L, 2, 0, mAct, S), mx, ground, { fx: mfx });
+
+    if (this.night) fb.grade(gradeNight);
+    if (this.def.look.eye && this.ms !== 'dead') fb.glow(mx + (beast ? -26 : -6), ground - (beast ? 44 : 70 * (L.scale ?? 1)), 10, this.def.look.eye, this.night ? 0.5 : 0.15);
+    if (this.zap) { fb.glow(hx + 30, ground - 50, 22, 0x80b0ff, 0.5 + Math.sin(t * 30) * 0.2); for (let i = 0; i < 6; i++) fb.pset(hx + 24 + Math.random() * 30, ground - 70 + Math.random() * 40, 0xd0e8ff); }
 
     if (this.bolt) {
       const k = this.bolt.t / this.bolt.dur;
       const flame = this.bolt.kind === 'flame';
-      const x = flame ? hx + 30 + (mx - hx - 50) * k : mx - 40 - (mx - hx - 50) * k;
-      const y = 128 - Math.sin(k * Math.PI) * 10;
-      for (let i = 1; i < 5; i++) fb.circle(x + (flame ? -i * 4 : i * 4), y, 3 - i * 0.5, i < 2 ? 12 : 4);
-      fb.circle(x, y, 4, 12);
-      fb.circle(x, y, 2, 14);
+      const x = flame ? hx + 34 + (mx - hx - 60) * k : mx - 44 - (mx - hx - 60) * k;
+      const y = ground - 64 - Math.sin(k * Math.PI) * 12;
+      fb.glow(x, y, 26, 0xff8020, 0.7);
+      for (let i = 1; i < 6; i++) fb.sphere(x + (flame ? -i * 5 : i * 5), y + Math.sin(i + t * 20), 4 - i * 0.6, 3.4 - i * 0.5, RAMP.fire, { amb: 0.8 });
+      fb.sphere(x, y, 5, 4.4, RAMP.fire, { amb: 1 });
     }
 
-    bar(fb, 8, 6, 118, h.hp / maxHP(h), 12, 4);
-    bar(fb, 8, 13, 118, h.sp / maxSP(h), 10, 2);
-    if (maxMP(h) > 0) bar(fb, 8, 20, 118, h.mp / maxMP(h), 11, 1);
-    bar(fb, 194, 6, 118, this.mhp / this.mmax, 12, 4);
+    for (const p of this.sparks) { fb.pset(p.x, p.y, p.c); if (p.life > 0.25) fb.pset(p.x - p.vx * 0.01, p.y - p.vy * 0.01, mix(p.c, 0x000000, 0.4)); }
+    for (const n of this.numbers) drawNumber(fb, n.text, n.x, n.y, n.life > 0.3 ? n.c : mix(n.c, 0x000000, 0.5));
+
+    bar(fb, 8, 6, 118, h.hp / maxHP(h), 0xe04a3a, 0x3a1210);
+    bar(fb, 8, 13, 118, h.sp / maxSP(h), 0x5ac04a, 0x14301a);
+    if (maxMP(h) > 0) bar(fb, 8, 20, 118, h.mp / maxMP(h), 0x5a9cf0, 0x101c3a);
+    bar(fb, 194, 6, 118, this.mhp / this.mmax, 0xe04a3a, 0x3a1210);
+
+    if (this.shake > 0) {
+      const dx = Math.round((Math.random() - 0.5) * 6), dy = Math.round((Math.random() - 0.5) * 4), src = fb.px.slice();
+      for (let y = 0; y < 200; y++) for (let x = 0; x < 320; x++) {
+        const sx = Math.min(319, Math.max(0, x + dx)), sy = Math.min(199, Math.max(0, y + dy));
+        fb.px[y * 320 + x] = src[sy * 320 + sx];
+      }
+    }
   }
 }
 
-function bar(fb: FB, x: number, y: number, w: number, f: number, c: number, c2: number) {
-  fb.rect(x - 1, y - 1, w + 2, 6, 0);
+function bar(fb: FB, x: number, y: number, w: number, f: number, c: Col, c2: Col) {
+  fb.rect(x - 1, y - 1, w + 2, 6, 0x0a0a0e);
   fb.rect(x, y, w, 4, c2);
-  fb.rect(x, y, Math.round(w * clamp(f, 0, 1)), 4, c);
-  fb.hline(x, x + Math.round(w * clamp(f, 0, 1)) - 1, y, 15);
+  const fw = Math.round(w * clamp(f, 0, 1));
+  fb.rect(x, y, fw, 4, c);
+  fb.hline(x, x + fw - 1, y, mix(c, 0xffffff, 0.45));
+  fb.hline(x, x + fw - 1, y + 3, mix(c, 0x000000, 0.35));
 }
 
 function an(name: string) {

@@ -1,6 +1,7 @@
 import { FB, rng } from './gfx';
-import { DUSK, IDENT, NIGHT, PalMap } from './palette';
-import { DIR, Look, LOOKS, sprite } from './sprites';
+import { Grade, T, b8, g8, gradeDawn, gradeDusk, gradeNight, r8 } from './palette';
+import { DIR, Look, LOOKS, WALK_FRAMES, sprite } from './sprites';
+import { backgroundFor } from './backgrounds';
 import { NPC, Rect, Room, ROOMS, Side } from './registry';
 import { parse, Parsed } from './parser';
 import { AUDIO } from './audio';
@@ -71,7 +72,7 @@ export class Game {
   npcRT: Record<string, NpcRT> = {};
   prev: { room: string; x: number; y: number } | null = null;
   hudT = 0;
-  titleRoom = 'crossroads';
+  titleRoom = 'towngate';
 
   // ---- lifecycle ----------------------------------------------------------------
 
@@ -95,8 +96,9 @@ export class Game {
 
   get room(): Room { return ROOMS[this.S.room]; }
   get hero(): Hero { return this.S.hero; }
-  get day() { return Math.floor(this.S.minutes / DAY) + 1; }
-  get hour() { return (this.S.minutes % DAY) / 60; }
+  get day() { return this.S ? Math.floor(this.S.minutes / DAY) + 1 : 1; }
+  /** Hour of day; before a game starts (title screen) it is always early evening. */
+  get hour() { return this.S ? (this.S.minutes % DAY) / 60 : 19.8; }
   get isNight() { const h = this.hour; return h >= 21 || h < 5; }
   get isDusk() { const h = this.hour; return (h >= 19 && h < 21) || (h >= 5 && h < 7); }
   get isDay() { return !this.isNight; }
@@ -528,7 +530,7 @@ export class Game {
     else { this.moving = false; this.target = null; return; }
     this.moving = true;
     this.ft += dt;
-    if (this.ft > (this.sneaking ? 0.18 : 0.12)) { this.ft = 0; this.frame = (this.frame + 1) % 4; }
+    if (this.ft > (this.sneaking ? 0.12 : 0.075)) { this.ft = 0; this.frame = (this.frame + 1) % WALK_FRAMES; }
     if (this.sneaking) {
       this.sneakT += dt;
       if (this.sneakT > 4) { this.sneakT = 0; this.train('stealth', 0.6); if (this.skill('stealth') > 0) this.award('sneak_practice'); }
@@ -567,7 +569,7 @@ export class Game {
         else rt.dir = n.dir;
       }
       rt.ft += dt;
-      if (rt.ft > 0.15) { rt.ft = 0; rt.frame = (rt.frame + 1) % 4; }
+      if (rt.ft > 0.11) { rt.ft = 0; rt.frame = (rt.frame + 1) % WALK_FRAMES; }
     }
   }
 
@@ -592,7 +594,7 @@ export class Game {
       m.dir = Math.abs(vx) >= Math.abs(vy) ? (vx < 0 ? DIR.LEFT : DIR.RIGHT) : vy < 0 ? DIR.UP : DIR.DOWN;
       if (m.def.look.kind && m.def.look.kind !== 'human') m.dir = vx < 0 ? DIR.LEFT : DIR.RIGHT;
       m.ft += dt;
-      if (m.ft > 0.14) { m.ft = 0; m.frame = (m.frame + 1) % 4; }
+      if (m.ft > 0.08) { m.ft = 0; m.frame = (m.frame + 1) % WALK_FRAMES; }
       if (m.noticed && d < 12) {
         this.startCombat(m.def.id, m.opts ?? {}, m);
         return;
@@ -602,9 +604,20 @@ export class Game {
 
   // ---- render -------------------------------------------------------------------------------
 
-  ambient(): PalMap {
-    if (!this.room.outdoor || this.mode === 'title') return IDENT;
-    return this.isNight ? NIGHT : this.isDusk ? DUSK : IDENT;
+  /** Colour grade for the current time of day (outdoors only). */
+  ambient(): Grade | null {
+    if (!this.S) return this.mode === 'title' || this.mode === 'create' ? gradeDusk : null;
+    if (!this.room.outdoor) return null;
+    const h = this.hour;
+    if (this.isNight) return gradeNight;
+    if (h >= 19 && h < 21) return gradeDusk;
+    if (h >= 5 && h < 7) return gradeDawn;
+    return null;
+  }
+
+  get lightsOn() {
+    if (!this.S) return true;
+    return this.isNight || this.isDusk;
   }
 
   render() {
@@ -616,47 +629,85 @@ export class Game {
 
   drawScene() {
     const r = this.S ? this.room : ROOMS[this.titleRoom];
-    const amb = this.S ? this.ambient() : IDENT;
-    const ambM = amb === IDENT ? null : amb;
-    if (this.bgId !== r.id) { this.bg.map = null; this.bg.clear(0); r.bg(this.bg); this.bgId = r.id; }
-    const fb = this.fb;
-    fb.map = null;
-    fb.copyFrom(this.bg, ambM);
-    if (this.S && r.outdoor && this.isNight) this.stars(fb);
-    fb.map = ambM;
-    r.anim?.(fb, this.t);
-    fb.map = null;
-    if (this.S && r.lights && (this.isNight || this.isDusk))
-      for (const w of r.lights) { fb.rect(w.x, w.y, w.w, w.h, 14); fb.vline(w.x + (w.w >> 1), w.y, w.y + w.h - 1, 6); fb.hline(w.x, w.x + w.w - 1, w.y + (w.h >> 1), 6); }
-    if (!this.S) return;
-    const sm = r.outdoor && this.isNight ? DUSK : null;
-    const list: { y: number; draw: () => void }[] = [];
-    for (const p of r.props ?? []) if (!p.visible || p.visible()) list.push({ y: p.y, draw: () => { fb.map = ambM; p.draw(fb, this.t); fb.map = null; } });
-    for (const n of this.visibleNpcs()) {
-      const rt = this.npcPos(n);
-      const L = typeof n.look === 'function' ? n.look() : n.look;
-      const act = rt.moving ? 'walk' : typeof n.act === 'function' ? n.act() : n.act ?? 'stand';
-      list.push({ y: rt.y, draw: () => fb.blit(sprite(L, rt.dir, rt.frame, act), rt.x, rt.y, { map: sm }) });
+    if (this.bgId !== r.id) {
+      this.bg.clear(0);
+      const img = backgroundFor(r.id);
+      if (img) this.bg.px.set(img.px); else r.bg(this.bg);
+      this.bgId = r.id;
     }
-    for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => fb.blit(sprite(c.def.look, 3, 0, 'dead'), c.x, c.y, { map: sm }) });
-    for (const m of this.monsters) list.push({ y: m.y, draw: () => fb.blit(sprite(m.def.look, m.dir, m.frame, 'walk'), m.x, m.y, { map: sm }) });
-    list.push({ y: this.S.y, draw: () => fb.blit(sprite(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand'), this.S.x, this.S.y, { map: sm }) });
-    list.sort((a, b) => a.y - b.y);
-    for (const d of list) d.draw();
+    const fb = this.fb;
+    fb.copyFrom(this.bg);
+    r.anim?.(fb, this.t);
+    if (this.S) {
+      const list: { y: number; draw: () => void }[] = [];
+      const actor = (s: FB, x: number, y: number, shadowW = 7) => { fb.shadow(x + 1, y, shadowW, 2.2, 0.42); fb.blit(s, x, y); };
+      (r.props ?? []).forEach((p, i) => {
+        if (p.visible && !p.visible()) return;
+        const layer = this.propLayer(r, i);
+        list.push({ y: p.y, draw: () => fb.blit(layer, 0, 0, { anchor: 'tl' }) });
+      });
+      for (const n of this.visibleNpcs()) {
+        const rt = this.npcPos(n);
+        const L = typeof n.look === 'function' ? n.look() : n.look;
+        const act = rt.moving ? 'walk' : typeof n.act === 'function' ? n.act() : n.act ?? 'stand';
+        list.push({ y: rt.y, draw: () => actor(sprite(L, rt.dir, rt.frame, act), rt.x, rt.y, 7 * (L.scale ?? 1)) });
+      }
+      for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => fb.blit(sprite(c.def.look, 3, 0, 'dead'), c.x, c.y) });
+      for (const m of this.monsters) list.push({ y: m.y, draw: () => actor(sprite(m.def.look, m.dir, m.frame, 'walk'), m.x, m.y, m.def.look.kind ? 12 : 7) });
+      list.push({ y: this.S.y, draw: () => actor(sprite(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand'), this.S.x, this.S.y) });
+      list.sort((a, b) => a.y - b.y);
+      for (const d of list) d.draw();
+    }
+    const grade = this.ambient();
+    if (grade) fb.grade(grade);
+    const dark = grade === gradeNight;
+    if (dark && r.outdoor) this.stars(fb);
+    if (r.lights && this.lightsOn) for (const w of r.lights) this.litWindow(fb, w.x, w.y, w.w, w.h, dark);
+    r.glow?.(fb, this.t, dark || !r.outdoor);
+  }
+
+  private propCache = new Map<string, FB>();
+
+  /** A prop rendered into its own transparent layer (pixels taken from a painted background if present). */
+  propLayer(r: Room, i: number): FB {
+    const p = r.props![i];
+    const key = `${r.id}|${i}|${p.key?.() ?? ''}`;
+    let layer = this.propCache.get(key);
+    if (layer) return layer;
+    layer = new FB(320, 200, T);
+    p.draw(layer);
+    const painted = backgroundFor(r.id);
+    if (painted) for (let k = 0; k < layer.px.length; k++) if (layer.px[k] !== T) layer.px[k] = painted.px[k];
+    this.propCache.set(key, layer);
+    return layer;
+  }
+
+  litWindow(fb: FB, x: number, y: number, w: number, h: number, dark: boolean) {
+    fb.fill(x, y, w, h, (px, py) => {
+      const c = fb.get(px, py);
+      const m = (px === x + (w >> 1) || py === y + (h >> 1)) ? 0.25 : 1;
+      const f = (0.75 + 0.25 * Math.sin(this.t * 3 + x)) * m;
+      return ((Math.min(255, 150 + f * 105) << 16) | (Math.min(255, 100 + f * 90) << 8) | Math.min(255, 30 + f * 40)) || c;
+    });
+    fb.glow(x + w / 2, y + h / 2, dark ? 30 : 18, 0xffa040, dark ? 0.5 : 0.28);
+    if (dark) fb.glow(x + w / 2, y + h + 18, 22, 0xff9030, 0.18);
   }
 
   stars(fb: FB) {
     const r = rng(77);
     const tw = Math.floor(this.t * 2);
-    for (let i = 0; i < 70; i++) {
+    const isSky = (x: number, y: number) => { const c = this.bg.get(x, y); return y < 120 && b8(c) > r8(c) + 30 && b8(c) > g8(c) + 10; };
+    for (let i = 0; i < 90; i++) {
       const x = Math.floor(r() * 320), y = Math.floor(r() * 110);
-      const c = this.bg.get(x, y);
-      if (c !== 9 && c !== 11) continue;
-      if ((i + tw) % 11 === 0) continue;
-      fb.pset(x, y, i % 5 === 0 ? 15 : 7);
+      if (!isSky(x, y) || (i + tw) % 13 === 0) continue;
+      fb.pset(x, y, i % 5 === 0 ? 0xffffff : 0xb8c4e8);
     }
-    const mx = 40 + ((this.S.minutes % DAY) / DAY) * 240;
-    if (this.bg.get(mx, 18) === 9) { fb.circle(mx, 18, 6, 15); fb.circle(mx + 3, 16, 5, 1); }
+    const mx = 40 + ((this.S.minutes % DAY) / DAY) * 240, my = 20;
+    if (isSky(mx, my)) {
+      fb.glow(mx, my, 22, 0x6070a0, 0.35);
+      fb.circle(mx, my, 6, 0xf4f0dc);
+      fb.circle(mx + 3, my - 2, 5, fb.get(mx + 12, my));
+    }
   }
 
   // ---- HUD -------------------------------------------------------------------------------------

@@ -73,6 +73,13 @@
     max-height: 86%;
     overflow-y: auto;
   }
+  #msg-portrait {
+    float: left; width: 96px; height: 96px; margin: 2px 14px 6px 0;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+    background: radial-gradient(circle at 40% 35%, #6b86b8, #22304f 75%);
+    border: 3px solid var(--ega-blue); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ega-blue);
+  }
+  #msg .box::after { content: ''; display: block; clear: both; }
   #msg-who { font-family: var(--display); font-size: 11px; color: var(--ega-blue); margin-bottom: 8px; letter-spacing: .04em; text-transform: uppercase; }
   #msg .more { text-align: right; color: var(--ega-red); font-size: 16px; margin-top: 6px; }
 
@@ -233,7 +240,7 @@
       </div>
     </div>
     <div id="toast" hidden></div>
-    <div id="msg" hidden><div class="box" role="dialog" aria-live="polite"><div id="msg-who"></div><div id="msg-text"></div><div class="more">Enter &#9660;</div></div></div>
+    <div id="msg" hidden><div class="box" role="dialog" aria-live="polite"><img id="msg-portrait" hidden alt=""><div id="msg-who"></div><div id="msg-text"></div><div class="more">Enter &#9660;</div></div></div>
     <div id="panel" hidden></div>
   </div>
   <div id="hud">

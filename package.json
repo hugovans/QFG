@@ -9,9 +9,16 @@
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single && node scripts/artifact.mjs",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "art:layouts": "tsx scripts/art-layouts.ts",
+    "art:generate": "tsx scripts/art-generate.ts",
+    "art:process": "tsx scripts/art-process.ts",
+    "art:all": "npm run art:layouts && npm run art:generate && npm run art:process"
   },
   "devDependencies": {
+    "@google/genai": "^1.52.0",
+    "sharp": "^0.34.5",
+    "tsx": "^4.23.15",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-singlefile": "^2.2.0"
