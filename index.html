@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Glory of Thornwick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #000000;
+    --paper: #FFFFFF;
+    --ega-blue: #0000AA;
+    --ega-red: #AA0000;
+    --ega-yellow: #FFFF55;
+    --ega-grey: #AAAAAA;
+    --ega-dgrey: #555555;
+    --ega-cyan: #55FFFF;
+    --hp: #FF5555;
+    --sp: #55FF55;
+    --mp: #55FFFF;
+    --ground: #000000;
+    --text: #FFFFFF;
+    --muted: #AAAAAA;
+    --display: 'Press Start 2P', 'Courier New', monospace;
+    --body: 'VT323', 'Courier New', ui-monospace, monospace;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--body);
+    font-size: 20px;
+    line-height: 1.15;
+  }
+  #app {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-inline: 16px;
+    padding-block: 12px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--ega-yellow); outline-offset: 2px; }
+
+  /* Sierra's white status line */
+  #status {
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: var(--paper); color: var(--ink);
+    padding: 2px 10px; font-size: 22px;
+  }
+  #status span { white-space: nowrap; }
+
+  #stage { position: relative; width: 100%; aspect-ratio: 4 / 3; max-width: 100%; background: var(--ink); overflow: hidden; }
+  #screen { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; cursor: crosshair; touch-action: manipulation; }
+
+  /* message box: white, with the red double border */
+  #msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 6%; pointer-events: auto; }
+  #msg .box {
+    max-width: min(560px, 92%);
+    background: var(--paper); color: var(--ink);
+    border: 3px solid var(--ega-red);
+    box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ega-red), 8px 10px 0 6px rgba(0,0,0,.6);
+    padding: 12px 16px 8px;
+    font-size: clamp(18px, 2.6vw, 24px);
+    line-height: 1.12;
+    max-height: 86%;
+    overflow-y: auto;
+  }
+  #msg-who { font-family: var(--display); font-size: 11px; color: var(--ega-blue); margin-bottom: 8px; letter-spacing: .04em; text-transform: uppercase; }
+  #msg .more { text-align: right; color: var(--ega-red); font-size: 16px; margin-top: 6px; }
+
+  #toast {
+    position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+    background: var(--ega-blue); color: var(--ega-yellow); border: 2px solid var(--ega-yellow);
+    padding: 3px 12px; font-size: 20px; white-space: nowrap; pointer-events: none;
+  }
+  #toast.show { animation: toast 2.6s steps(6) forwards; }
+  @keyframes toast { 0% { opacity: 0; } 8% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* overlay panels: title, creation, sheets */
+  #panel { position: absolute; inset: 0; display: grid; place-items: center; padding: 3%; background: rgba(0,0,40,.55); overflow-y: auto; }
+  .panel-inner {
+    width: min(620px, 100%);
+    background: var(--paper); color: var(--ink);
+    border: 3px solid var(--ega-blue);
+    box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ega-blue), 8px 10px 0 6px rgba(0,0,0,.6);
+    padding: 14px 18px;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  .panel-inner.wide { width: min(820px, 100%); }
+  .panel-inner h2 { font-family: var(--display); font-size: 14px; margin: 0 0 12px; color: var(--ega-red); line-height: 1.5; text-wrap: balance; }
+  .panel-inner h3 { font-family: var(--display); font-size: 10px; margin: 10px 0 6px; color: var(--ega-blue); letter-spacing: .04em; text-transform: uppercase; }
+  .panel-inner p { margin: 6px 0; }
+  .panel-inner button {
+    background: var(--paper); color: var(--ink);
+    border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+    padding: 3px 12px; font-size: 20px;
+  }
+  .panel-inner button:hover:not(:disabled) { background: var(--ega-yellow); }
+  .panel-inner button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .panel-inner button:disabled { color: var(--ega-grey); border-color: var(--ega-grey); box-shadow: none; cursor: default; }
+  .panel-inner button.big { background: var(--ega-blue); color: var(--paper); font-size: 22px; }
+  .panel-inner button.big:hover { background: var(--ega-red); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .row.end { justify-content: flex-end; }
+  .fine { font-size: 17px; color: var(--ega-dgrey); }
+  .pts { font-size: 20px; }
+  .pts small { color: var(--ega-dgrey); font-size: 16px; margin-left: 6px; }
+
+  .title { text-align: center; }
+  .title .eyebrow, .end .eyebrow { font-family: var(--display); font-size: 9px; color: var(--ega-blue); letter-spacing: .12em; text-transform: uppercase; margin: 4px 0 14px; }
+  .title h1 {
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(22px, 5vw, 40px); line-height: 1.35; margin: 0 0 14px;
+    color: var(--ega-yellow);
+    text-shadow: 3px 3px 0 var(--ega-red), 6px 6px 0 var(--ink);
+    -webkit-text-stroke: 1px var(--ink);
+  }
+  .title .sub { font-size: 22px; max-width: 30em; margin-inline: auto; }
+  .title .row { justify-content: center; }
+
+  .classes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .panel-inner .cls { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; box-shadow: 3px 3px 0 var(--ink); }
+  .panel-inner .cls b { font-family: var(--display); font-size: 10px; font-weight: 400; color: var(--ega-red); }
+  .panel-inner .cls span { font-size: 17px; line-height: 1.05; }
+  .panel-inner .cls.on { background: var(--ega-cyan); }
+  .name { display: flex; gap: 10px; align-items: center; margin: 12px 0 4px; font-size: 20px; }
+  .name input { font: inherit; font-size: 22px; border: 2px solid var(--ink); padding: 2px 8px; width: 12em; max-width: 60%; background: var(--paper); color: var(--ink); }
+  .sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; }
+  .stat { display: grid; grid-template-columns: 1fr auto 2.2em auto; align-items: center; gap: 6px; position: relative; padding-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .stat.ro { grid-template-columns: 1fr 2.2em; }
+  .stat.dim { color: var(--ega-grey); }
+  .stat b { text-align: right; }
+  .panel-inner .stat button { padding: 0 8px; font-size: 18px; box-shadow: 2px 2px 0 var(--ink); line-height: 1.1; }
+  .stat i { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--ega-blue) var(--v), #DDD var(--v)); }
+  .inv { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .inv li { display: grid; gap: 1px; border-bottom: 1px dashed var(--ega-grey); padding-bottom: 5px; }
+  .inv b { color: var(--ega-blue); font-weight: 400; font-size: 22px; }
+  .inv span { font-size: 18px; }
+  .slots { display: grid; gap: 8px; }
+  .panel-inner .slots button { text-align: left; display: grid; gap: 2px; }
+  .slots span { font-size: 17px; color: var(--ega-dgrey); }
+  .help ul { margin: 4px 0 8px; padding-left: 20px; }
+  .help li { font-size: 19px; }
+  kbd { font: inherit; border: 1px solid var(--ink); padding: 0 4px; background: #EEE; }
+  .end { text-align: center; }
+  .end .story { text-align: left; font-size: 20px; max-width: 34em; margin-inline: auto; }
+  .end.death h2 { color: var(--ink); }
+  .end .row { justify-content: center; }
+
+  /* combat controls */
+  #combat { position: absolute; inset: 0; padding: 6px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; pointer-events: none; }
+  #combat-top { position: absolute; top: 13%; left: 0; right: 0; display: flex; justify-content: space-between; padding-inline: 2.5%; font-size: clamp(14px, 2vw, 20px); text-shadow: 2px 2px 0 var(--ink); pointer-events: none; }
+  #c-log { align-self: center; background: rgba(0,0,0,.75); color: var(--paper); padding: 2px 10px; font-size: clamp(16px, 2.2vw, 22px); text-align: center; max-width: 100%; }
+  #c-buttons { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; pointer-events: auto; }
+  #c-buttons button {
+    background: var(--ega-blue); color: var(--paper); border: 2px solid var(--paper);
+    padding: 2px 10px; font-size: clamp(16px, 2vw, 21px); box-shadow: 2px 2px 0 var(--ink);
+  }
+  #c-buttons button:hover { background: var(--ega-red); }
+  #c-buttons button kbd { background: none; border-color: var(--ega-yellow); color: var(--ega-yellow); font-size: .8em; margin-left: 4px; }
+  #c-buttons .spell { background: #550088; }
+
+  /* HUD under the screen */
+  #hud { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 19px; color: var(--muted); }
+  .meter { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+  .meter > span { color: var(--text); width: 1.6em; }
+  .meter > div { width: 90px; height: 10px; background: #222; border: 1px solid var(--ega-dgrey); position: relative; }
+  .meter i { position: absolute; inset: 0 auto 0 0; }
+  #m-hp i { background: var(--hp); } #m-sp i { background: var(--sp); } #m-mp i { background: var(--mp); }
+  .meter b { font-weight: 400; min-width: 4.4em; }
+  #hud .spacer { flex: 1; }
+  #hud-room { color: var(--ega-yellow); }
+
+  #parser { display: flex; align-items: center; gap: 6px; background: var(--ink); border: 2px solid var(--ega-dgrey); padding: 2px 8px; }
+  #parser span { color: var(--ega-yellow); font-size: 24px; }
+  #cmd { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--paper); font: inherit; font-size: 24px; caret-color: var(--ega-yellow); text-transform: uppercase; outline: none; }
+  #cmd::placeholder { color: var(--ega-dgrey); text-transform: none; }
+  #parser:focus-within { border-color: var(--ega-yellow); }
+
+  #tools { display: flex; flex-wrap: wrap; gap: 6px; }
+  #tools button {
+    background: var(--ink); color: var(--text); border: 2px solid var(--ega-dgrey);
+    padding: 1px 10px; font-size: 19px;
+  }
+  #tools button:hover { border-color: var(--paper); }
+  #tools button[aria-pressed="true"] { background: var(--ega-blue); border-color: var(--ega-cyan); }
+  footer { color: var(--ega-dgrey); font-size: 16px; }
+
+  @media (max-width: 560px) {
+    body { font-size: 18px; }
+    .classes, .sheet { grid-template-columns: 1fr; }
+    #status { font-size: 18px; }
+    .meter > div { width: 60px; }
+    #combat { padding: 3px; gap: 3px; }
+    #c-log { font-size: 14px; padding: 0 6px; }
+    #c-buttons { gap: 3px; }
+    #c-buttons button { font-size: 15px; padding: 0 6px; }
+    #c-buttons button kbd { display: none; }
+    #combat-top { font-size: 13px; }
+    #msg { padding: 3%; }
+    #msg .box { font-size: 17px; padding: 8px 10px 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #toast.show { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="status"><span id="st-score">Score: 0</span><span id="st-name">Glory of Thornwick</span></header>
+  <div id="stage">
+    <canvas id="screen" width="320" height="200" aria-label="Game screen"></canvas>
+    <div id="combat" hidden>
+      <div id="combat-top"><span>You</span><span id="c-name">Monster</span></div>
+      <div id="c-log"></div>
+      <div id="c-buttons">
+        <button data-act="attack">Attack<kbd>A</kbd></button>
+        <button data-act="parry">Parry<kbd>S</kbd></button>
+        <button data-act="dodge">Dodge<kbd>D</kbd></button>
+        <button data-act="zap" id="c-zap" class="spell" hidden>Zap<kbd>Z</kbd></button>
+        <button data-act="flame" id="c-flame" class="spell" hidden>Flame<kbd>F</kbd></button>
+        <button data-act="calm" id="c-calm" class="spell" hidden>Calm<kbd>C</kbd></button>
+        <button data-act="potion" id="c-potion" hidden>Potion<kbd>H</kbd></button>
+        <button data-act="special" id="c-special" hidden>Special<kbd>T</kbd></button>
+        <button data-act="flee" id="c-flee">Run<kbd>R</kbd></button>
+      </div>
+    </div>
+    <div id="toast" hidden></div>
+    <div id="msg" hidden><div class="box" role="dialog" aria-live="polite"><div id="msg-who"></div><div id="msg-text"></div><div class="more">Enter &#9660;</div></div></div>
+    <div id="panel" hidden></div>
+  </div>
+  <div id="hud">
+    <div class="meter" id="m-hp"><span>HP</span><div><i></i></div><b>—</b></div>
+    <div class="meter" id="m-sp"><span>SP</span><div><i></i></div><b>—</b></div>
+    <div class="meter" id="m-mp"><span>MP</span><div><i></i></div><b>—</b></div>
+    <span class="spacer"></span>
+    <span id="hud-room"></span>
+    <span id="hud-time"></span>
+    <span id="hud-silver"></span>
+  </div>
+  <form id="parser" autocomplete="off"><span>&gt;</span><input id="cmd" aria-label="Type a command" placeholder="Type a command, e.g. look at board" spellcheck="false" autocapitalize="off"></form>
+  <nav id="tools" aria-label="Game menu">
+    <button data-tool="look">Look</button>
+    <button data-tool="stats">Character</button>
+    <button data-tool="inv">Inventory</button>
+    <button data-tool="sneak" id="btn-sneak" aria-pressed="false">Sneak</button>
+    <button data-tool="rest">Rest</button>
+    <button data-tool="save">Save</button>
+    <button data-tool="load">Restore</button>
+    <button data-tool="sound" aria-pressed="false">Mute</button>
+    <button data-tool="help">Help</button>
+  </nav>
+  <footer>An original homage to the Sierra adventure/RPG hybrids of 1989. All art, music and writing made for this game.</footer>
+</div>
+<script type="module" src="./src/main.ts"></script>
+</body>
+</html>

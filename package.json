@@ -1,0 +1,19 @@
+{
+  "name": "glory-of-thornwick",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "An original Quest for Glory style adventure/RPG hybrid in the browser.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "tsc --noEmit && vite build --mode single && node scripts/artifact.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "vite-plugin-singlefile": "^2.2.0"
+  }
+}
