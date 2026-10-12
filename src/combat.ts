@@ -41,7 +41,7 @@ export class Combat {
   bolt: { kind: 'flame' | 'fire'; t: number; dur: number } | null = null;
   outcome: 'win' | 'flee' | 'calm' | null = null;
   endT = 0;
-  bg = new FB();
+  bg = new FB(320, 200, 0, G.fb.k);
 
   constructor(def: MonsterDef, opts: CombatOpts) {
     this.def = def;
@@ -49,6 +49,7 @@ export class Combat {
     this.mhp = this.mmax = def.hp;
     this.mt = 1.2 + Math.random();
     this.drawArena(opts.arena ?? 'forest');
+    G.style.bgFinish?.(this.bg);
     this.log(`${an(def.name)} attacks! Fight with the buttons below, or the arrow keys.`);
   }
 
@@ -344,7 +345,7 @@ export class Combat {
   render(fb: FB, t: number) {
     fb.copyFrom(this.bg);
     const h = G.hero;
-    const S = 2.3;
+    const S = 2.3 * fb.k;
     const ground = 186;
     const heroAct = ({ ready: 'ready', attack: 'attack', parry: 'parry', dodge: 'ready', cast: 'cast', hurt: 'ready' } as const)[this.hs];
     let hx = 106;
@@ -387,10 +388,11 @@ export class Combat {
     bar(fb, 194, 6, 118, this.mhp / this.mmax, 0xe04a3a, 0x3a1210);
 
     if (this.shake > 0) {
-      const dx = Math.round((Math.random() - 0.5) * 6), dy = Math.round((Math.random() - 0.5) * 4), src = fb.px.slice();
-      for (let y = 0; y < 200; y++) for (let x = 0; x < 320; x++) {
-        const sx = Math.min(319, Math.max(0, x + dx)), sy = Math.min(199, Math.max(0, y + dy));
-        fb.px[y * 320 + x] = src[sy * 320 + sx];
+      const W2 = fb.w, H2 = fb.h, src = fb.px.slice();
+      const dx = Math.round((Math.random() - 0.5) * 6 * fb.k), dy = Math.round((Math.random() - 0.5) * 4 * fb.k);
+      for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) {
+        const sx = Math.min(W2 - 1, Math.max(0, x + dx)), sy = Math.min(H2 - 1, Math.max(0, y + dy));
+        fb.px[y * W2 + x] = src[sy * W2 + sx];
       }
     }
   }

@@ -21,7 +21,7 @@ defRoom({
     check: () => {
       if (!gateClosed()) return true;
       G.say("The town gate is shut and barred for the night. A voice calls down from the wall: \"Gate opens at six! Go away!\"" +
-        (G.hero.cls === 'thief' ? '\n\n(A skilled climber might find another way over the wall...)' : ''));
+        (G.skill('climbing') > 0 ? '\n\n(A skilled climber might find another way over the wall...)' : ''));
       return false;
     },
   }],
@@ -188,7 +188,11 @@ defRoom({
         'wizard,zephram,tower': '"Zephram\'s his name. Lives past the troll bridge. Mad as a hatful of frogs, but he loves a riddle."',
         'faerie,faeries,fairy,glen': '"Faeries dance in the glen north of the Deepwood on warm nights. If you\'re light on your feet, they\'re friendly enough."',
         'healer,hilde,potion': '"Mother Hilde, south of the gate. Best potions in the valley. She lost her ring a while back and she\'s been grumpy ever since."',
-        'thief,thieves,guild': () => G.say(G.hero.cls === 'thief' ? 'Oswin leans in. "The alley off Main Street. After dark. You know the sign." He winks.' : '"Thieves? In Thornwick?" Oswin polishes a mug very carefully.', 'Oswin'),
+        'thief,thieves,guild': () => {
+          if (G.hero.cls !== 'hero' && G.hero.cls !== 'thief') { G.say('"Thieves? In Thornwick?" Oswin polishes a mug very carefully.', 'Oswin'); return; }
+          G.set('knowsSign');
+          G.say('Oswin glances around, then leans in. "The black door in the alley off Main Street. After dark. Knock, and make the sign: two fingers to the brow, then a flick, like so." He shows you. "You didn\'t learn it from me."', 'Oswin');
+        },
         'baron,castle,aldric': '"The Baron shut himself in the castle when his girl disappeared. Proud man. Broken man."',
         'wren,daughter,girl': '"Lady Wren. Golden hair, laughed like a bell, rode like the wind. Five years gone now. Went into the woods and never came out."',
         'crone,witch': '"There was an old witch in the hills, years back. Nasty piece of work. Nobody\'s seen her since the year Lady Wren vanished." He frowns. "Funny, that."',

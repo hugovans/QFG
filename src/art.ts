@@ -45,7 +45,8 @@ export function mountains(fb: FB, base: number, height: number, seed: number, la
   };
   const top = new Float32Array(320);
   for (let i = 0; i < 320; i++) top[i] = ridge(i);
-  fb.fill(0, base - height - 5, 320, height + 70, (xx, yy) => {
+  fb.fill(0, base - height - 5, 320, height + 70, (fx, yy) => {
+    const xx = Math.min(319, Math.floor(fx));
     if (yy < top[xx]) return T;
     const slope = (top[Math.min(319, xx + 2)] - top[Math.max(0, xx - 2)]) * 0.25;
     const lit = 0.5 + slope * 0.35 - (yy - top[xx]) / (height * 3) + (fbm(xx * 0.08, yy * 0.08, seed + 3) - 0.5) * 0.35;
@@ -59,7 +60,8 @@ export function mountains(fb: FB, base: number, height: number, seed: number, la
 export function hills(fb: FB, base: number, height: number, seed: number, R: Ramp = RAMP.grass, bright = 0.5) {
   const top = new Float32Array(320);
   for (let i = 0; i < 320; i++) top[i] = base - height * (0.35 + 0.65 * fbm(i * 0.012, 0, seed, 3));
-  fb.fill(0, base - height - 2, 320, 200 - base + height + 2, (x, y) => {
+  fb.fill(0, base - height - 2, 320, 200 - base + height + 2, (fx, y) => {
+    const x = Math.min(319, Math.floor(fx));
     if (y < top[x]) return T;
     const d = (y - top[x]) / 30;
     return rampAt(R, bright + 0.25 - d * 0.35 + (fbm(x * 0.05, y * 0.09, seed + 5) - 0.5) * 0.4, x, y);
@@ -107,7 +109,7 @@ export function dirt(fb: FB, pts: number[][], seed = 3, R: Ramp = RAMP.dirt) {
   const mask = new FB(320, 200, 0);
   mask.poly(pts, 1);
   fb.fill(0, 0, 320, 200, (x, y) => {
-    if (mask.px[y * 320 + x] !== 1) return T;
+    if (mask.get(x, y) !== 1) return T;
     const n = fbm(x * 0.07, y * 0.16, seed, 4), fine = noise(x * 0.8, y * 0.8, seed + 4);
     let edge = 0;
     for (const [dx, dy] of [[3, 0], [-3, 0], [0, 2], [0, -2]]) if (mask.get(x + dx, y + dy) !== 1) edge++;

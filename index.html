@@ -186,6 +186,12 @@
   .meter b { font-weight: 400; min-width: 4.4em; }
   #hud .spacer { flex: 1; }
   #hud-room { color: var(--ega-yellow); }
+  #hud-style { color: var(--ega-cyan); }
+  .styles { display: grid; gap: 8px; }
+  .panel-inner .styles button { text-align: left; display: grid; grid-template-columns: 2.2em 1fr; gap: 2px 10px; align-items: baseline; }
+  .panel-inner .styles button b { grid-row: span 2; font-family: var(--display); font-size: 14px; font-weight: 400; color: var(--ega-red); }
+  .panel-inner .styles button span { font-size: 17px; color: var(--ega-dgrey); }
+  .panel-inner .styles button[aria-pressed="true"] { background: var(--ega-cyan); }
 
   #parser { display: flex; align-items: center; gap: 6px; background: var(--ink); border: 2px solid var(--ega-dgrey); padding: 2px 8px; }
   #parser span { color: var(--ega-yellow); font-size: 24px; }
@@ -248,6 +254,7 @@
     <div class="meter" id="m-sp"><span>SP</span><div><i></i></div><b>—</b></div>
     <div class="meter" id="m-mp"><span>MP</span><div><i></i></div><b>—</b></div>
     <span class="spacer"></span>
+    <span id="hud-style" title="Visual style"></span>
     <span id="hud-room"></span>
     <span id="hud-time"></span>
     <span id="hud-silver"></span>
@@ -262,6 +269,7 @@
     <button data-tool="save">Save</button>
     <button data-tool="load">Restore</button>
     <button data-tool="sound" aria-pressed="false">Mute</button>
+    <button data-tool="style">Style</button>
     <button data-tool="help">Help</button>
   </nav>
   <footer>An original homage to the Sierra adventure/RPG hybrids of 1989. All art, music and writing made for this game.</footer>

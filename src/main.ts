@@ -1,15 +1,16 @@
 import './rooms/town';
 import './rooms/wilds';
-import { G } from './game';
+import { G, classTitle } from './game';
 import { AUDIO } from './audio';
 import * as UI from './ui';
 import { ROOMS } from './registry';
 import { loadBackgrounds } from './backgrounds';
+import { STYLES, STYLE_ORDER, StyleId, forcedStyle, setForcedStyle } from './styles';
 import { LOOKS, Look, portrait } from './sprites';
 import { FB } from './gfx';
 import { T } from './palette';
 import {
-  BONUS_POINTS, CLASSES, ClassDef, ITEMS, MAX_SCORE, SKILL_NAMES, SPELLS, STAT_NAMES, Skill, Stat, maxHP, maxMP, maxSP, newHero,
+  HERO, ITEMS, MAX_SCORE, SKILL_NAMES, SPELLS, STAT_NAMES, Skill, Stat, maxHP, maxMP, maxSP, newHero,
 } from './state';
 
 const canvas = UI.$<HTMLCanvasElement>('screen');
@@ -31,7 +32,7 @@ function showTitle() {
         <button id="t-new" class="big" autofocus>New hero</button>
         ${saves.length ? '<button id="t-load" class="big">Restore a game</button>' : ''}
       </div>
-      <p class="fine">Choose Fighter, Magic User or Thief. Type commands, fight in real time, and find your own way to be a hero.</p>
+      <p class="fine">Type commands, fight in real time, and find your own way to be a hero.</p>
     </div>`, (root) => {
     root.querySelector('#t-new')!.addEventListener('click', () => { AUDIO.unlock(); AUDIO.music('title'); showCreate(); });
     root.querySelector('#t-load')?.addEventListener('click', () => { AUDIO.unlock(); showSaves('load', true); });
@@ -40,63 +41,24 @@ function showTitle() {
 
 function showCreate() {
   G.mode = 'create';
-  let cls: ClassDef = CLASSES[0];
-  let stats: Record<Stat, number>;
-  let skills: Record<Skill, number>;
-  let left = BONUS_POINTS;
-  const reset = () => { stats = { ...cls.stats }; skills = { ...cls.skills }; left = BONUS_POINTS; };
-  reset();
-  let name = 'Hero';
-
-  const render = () => {
-    const statRows = (Object.keys(STAT_NAMES) as Stat[]).map((s) => row('stat', s, STAT_NAMES[s], stats[s], cls.stats[s])).join('');
-    const skillRows = (Object.keys(SKILL_NAMES) as Skill[]).map((s) => row('skill', s, SKILL_NAMES[s], skills[s], cls.skills[s])).join('');
-    UI.showPanel(`
-      <h2>Create your hero</h2>
-      <div class="classes">
-        ${CLASSES.map((c) => `<button class="cls${c.id === cls.id ? ' on' : ''}" data-cls="${c.id}" aria-pressed="${c.id === cls.id}"><b>${c.name}</b><span>${c.blurb}</span></button>`).join('')}
-      </div>
-      <label class="name">Name <input id="c-hero-name" maxlength="16" value="${UI.esc(name)}" autocomplete="off"></label>
-      <p class="pts">Bonus points to spend: <b>${left}</b> <small>Each + costs 5 points. Unlocking an untrained skill costs 15.</small></p>
-      <div class="sheet">
-        <div><h3>Attributes</h3>${statRows}</div>
-        <div><h3>Skills</h3>${skillRows}</div>
-      </div>
-      <div class="row end"><button id="c-back">Back</button><button id="c-go" class="big">Begin the adventure</button></div>
-    `, (root) => {
-      root.querySelectorAll<HTMLButtonElement>('[data-cls]').forEach((b) => b.addEventListener('click', () => { cls = CLASSES.find((c) => c.id === b.dataset.cls)!; reset(); render(); }));
-      const nameIn = root.querySelector<HTMLInputElement>('#c-hero-name')!;
-      nameIn.addEventListener('input', () => { name = nameIn.value; });
-      root.querySelectorAll<HTMLButtonElement>('[data-adj]').forEach((b) => b.addEventListener('click', () => {
-        const [kind, key, dir] = b.dataset.adj!.split(':');
-        const tbl: Record<string, number> = kind === 'stat' ? stats : skills;
-        const base = kind === 'stat' ? cls.stats[key as Stat] : cls.skills[key as Skill];
-        if (dir === '+') {
-          const cost = kind === 'skill' && tbl[key] === 0 ? 15 : 5;
-          if (left < cost || tbl[key] >= 100) return;
-          left -= cost;
-          tbl[key] += 5;
-        } else {
-          if (tbl[key] <= base) return;
-          tbl[key] -= 5;
-          left += kind === 'skill' && tbl[key] === 0 ? 15 : 5;
-        }
-        render();
-      }));
-      root.querySelector('#c-back')!.addEventListener('click', showTitle);
-      root.querySelector('#c-go')!.addEventListener('click', () => {
-        const n = (name || 'Hero').trim().slice(0, 16) || 'Hero';
-        UI.hidePanel();
-        G.start(newHero(cls, n, stats, skills));
-        cmd.focus();
-      });
-    }, undefined, true);
-  };
-
-  function row(kind: string, key: string, label: string, v: number, base: number) {
-    return `<div class="stat"><span>${label}</span><button data-adj="${kind}:${key}:-" ${v <= base ? 'disabled' : ''} aria-label="Lower ${label}">−</button><b>${v}</b><button data-adj="${kind}:${key}:+" aria-label="Raise ${label}">+</button><i style="--v:${v}%"></i></div>`;
-  }
-  render();
+  UI.showPanel(`
+    <h2>Who are you?</h2>
+    <p>You arrive in Thornwick with a sword, a shield, a lockpick, a single spell and a great deal of optimism. Every skill improves the more you use it.</p>
+    <label class="name">Name <input id="c-hero-name" maxlength="16" value="Hero" autocomplete="off" autofocus></label>
+    <div class="row end"><button id="c-back">Back</button><button id="c-go" class="big">Begin the adventure</button></div>
+  `, (root) => {
+    const nameIn = root.querySelector<HTMLInputElement>('#c-hero-name')!;
+    nameIn.select();
+    const go = () => {
+      const n = nameIn.value.trim().slice(0, 16) || 'Hero';
+      UI.hidePanel();
+      G.start(newHero(HERO, n, HERO.stats, HERO.skills));
+      cmd.focus();
+    };
+    nameIn.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    root.querySelector('#c-back')!.addEventListener('click', showTitle);
+    root.querySelector('#c-go')!.addEventListener('click', go);
+  });
 }
 
 // ---- in-game panels -----------------------------------------------------------------------
@@ -106,7 +68,7 @@ function bars(v: number) { return `<i style="--v:${Math.min(100, v)}%"></i>`; }
 function showStats() {
   const h = G.hero;
   UI.showPanel(`
-    <h2>${UI.esc(h.name)} the ${h.cls === 'fighter' ? 'Fighter' : h.cls === 'mage' ? 'Magic User' : 'Thief'}</h2>
+    <h2>${UI.esc(h.name)}${classTitle(h) ? ' the ' + classTitle(h) : ''}</h2>
     <p class="pts">Health ${Math.ceil(h.hp)}/${maxHP(h)} &middot; Stamina ${Math.ceil(h.sp)}/${maxSP(h)}${maxMP(h) ? ` &middot; Magic ${Math.ceil(h.mp)}/${maxMP(h)}` : ''} &middot; Score ${G.score} of ${MAX_SCORE}</p>
     <div class="sheet">
       <div><h3>Attributes</h3>${(Object.keys(STAT_NAMES) as Stat[]).map((s) => `<div class="stat ro"><span>${STAT_NAMES[s]}</span><b>${h.stats[s]}</b>${bars(h.stats[s])}</div>`).join('')}</div>
@@ -196,11 +158,34 @@ function showEnd(kind: 'death' | 'win', title: string, text: string) {
   });
 }
 
+function showStyles() {
+  const cur = forcedStyle();
+  const opt = (id: StyleId | null, title: string, sub: string) =>
+    `<button data-style="${id ?? 'room'}" aria-pressed="${cur === id}"><b>${id ?? '★'}</b>${UI.esc(title)}<span>${UI.esc(sub)}</span></button>`;
+  UI.showPanel(`
+    <h2>Visual style</h2>
+    <p>Each part of the valley is drawn in a different style, from chunky early pixels to smooth high resolution. Pick one to see every room that way.</p>
+    <div class="styles">
+      ${opt(null, 'Each room in its own style', 'Outside the town A · town B · healer and meadow C · river and wizard D · kobold and fortress E')}
+      ${STYLE_ORDER.map((id) => opt(id, STYLES[id].name, STYLES[id].detail)).join('')}
+    </div>
+    <div class="row end"><button id="p-close">Close</button></div>`, (root) => {
+    root.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => b.addEventListener('click', () => {
+      const v = b.dataset.style!;
+      setForcedStyle(v === 'room' ? null : (v as StyleId));
+      G.restyle();
+      UI.hidePanel();
+    }));
+    bindClose(root);
+  }, () => cmd.focus());
+}
+
 function bindClose(root: HTMLElement) {
   root.querySelector('#p-close')?.addEventListener('click', () => UI.hidePanel());
 }
 
 G.onEnd = showEnd;
+G.onStyle = (st) => { UI.$('hud-style').textContent = `Style ${st.id}: ${st.name}`; };
 G.onMeta = (what) => {
   if (what === 'help') showHelp();
   if (what === 'inventory') showInventory();
@@ -298,6 +283,7 @@ document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((b) => b.add
     case 'load': showSaves('load'); break;
     case 'sound': b.setAttribute('aria-pressed', String(!AUDIO.toggle())); break;
     case 'help': showHelp(); break;
+    case 'style': showStyles(); break;
   }
 }));
 
@@ -357,4 +343,4 @@ loadBackgrounds().finally(() => {
 });
 
 // Debug handle for the browser console: __thornwick.G.go('meadow', 160, 160)
-(window as any).__thornwick = { G, ROOMS, UI };
+(window as any).__thornwick = { G, ROOMS, UI, setForcedStyle };

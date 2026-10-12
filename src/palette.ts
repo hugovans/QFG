@@ -27,9 +27,19 @@ export const lum = (c: Col) => (r8(c) * 0.299 + g8(c) * 0.587 + b8(c) * 0.114) /
 export const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 export const bayer = (x: number, y: number) => BAYER[((y & 3) << 2) | (x & 3)] / 16 - 0.47;
 
+/** Global render switches, set per frame by the active visual style. */
+export const RENDER = {
+  /** Blend smoothly between ramp steps instead of dithering (high-resolution styles). */
+  smooth: false,
+};
+
 /** Pick a colour from a ramp at brightness t (0..1), dithering between steps. */
 export function rampAt(ramp: Ramp, t: number, x: number, y: number, dither = 1): Col {
   const n = ramp.length - 1;
+  if (RENDER.smooth) {
+    const v = Math.max(0, Math.min(n, t * n)), i = Math.min(n - 1, Math.floor(v));
+    return n === 0 ? ramp[0] : mix(ramp[i], ramp[i + 1], v - i);
+  }
   let v = t * n + bayer(x, y) * dither;
   v = Math.round(v);
   return ramp[v < 0 ? 0 : v > n ? n : v];

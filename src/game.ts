@@ -1,5 +1,6 @@
 import { FB, rng } from './gfx';
-import { Grade, T, b8, g8, gradeDawn, gradeDusk, gradeNight, r8 } from './palette';
+import { Grade, RENDER, T, b8, g8, gradeDawn, gradeDusk, gradeNight, r8 } from './palette';
+import { STYLES, Style, styleFor } from './styles';
 import { DIR, Look, LOOKS, WALK_FRAMES, sprite } from './sprites';
 import { backgroundFor } from './backgrounds';
 import { NPC, Rect, Room, ROOMS, Side } from './registry';
@@ -104,7 +105,7 @@ export class Game {
   get isDay() { return !this.isNight; }
 
   get heroLook(): Look {
-    return this.hero.cls === 'fighter' ? LOOKS.heroFighter : this.hero.cls === 'mage' ? LOOKS.heroMage : LOOKS.heroThief;
+    return this.hero.cls === 'mage' ? LOOKS.heroMage : this.hero.cls === 'thief' ? LOOKS.heroThief : LOOKS.heroFighter;
   }
 
   flag(k: string) { return this.S.flags[k]; }
@@ -434,6 +435,7 @@ export class Game {
     this.target = null;
     this.mode = 'combat';
     this.combatActor = actor;
+    this.applyStyle(styleFor(this.room.id));
     this.combat = new Combat(MONSTERS[id], { arena: this.room.arena ?? 'forest', ...opts });
     AUDIO.music('combat');
     UI.$('combat').hidden = false;
@@ -620,9 +622,42 @@ export class Game {
     return this.isNight || this.isDusk;
   }
 
+  /** The visual style currently on screen. */
+  style: Style = STYLES.C;
+
+  /** Switch the framebuffers and canvas to a style's pixel density. */
+  applyStyle(st: Style) {
+    if (st.id === this.style.id && this.fb.k === st.k && !this.styleDirty) { RENDER.smooth = st.smooth; return; }
+    this.styleDirty = false;
+    this.style = st;
+    RENDER.smooth = st.smooth;
+    if (this.fb.k !== st.k) {
+      this.fb = new FB(320, 200, 0, st.k);
+      this.bg = new FB(320, 200, 0, st.k);
+      if (this.canvas) {
+        this.canvas.width = this.fb.w;
+        this.canvas.height = this.fb.h;
+        this.img = this.ctx.createImageData(this.fb.w, this.fb.h);
+      }
+    }
+    this.bgId = '';
+    this.onStyle?.(st);
+  }
+
+  onStyle: ((st: Style) => void) | null = null;
+
+  private styleDirty = false;
+
+  /** Re-render everything in the current style (e.g. after the style setting changes). */
+  restyle() { this.styleDirty = true; }
+
   render() {
+    const room = this.S ? this.room : ROOMS[this.titleRoom];
+    const st = styleFor(room.id);
+    this.applyStyle(st);
     if (this.mode === 'combat' && this.combat) this.combat.render(this.fb, this.t);
     else if (this.S || this.mode === 'title' || this.mode === 'create') this.drawScene();
+    st.post?.(this.fb);
     this.fb.toImage(this.img);
     this.ctx.putImageData(this.img, 0, 0);
   }
@@ -632,7 +667,8 @@ export class Game {
     if (this.bgId !== r.id) {
       this.bg.clear(0);
       const img = backgroundFor(r.id);
-      if (img) this.bg.px.set(img.px); else r.bg(this.bg);
+      if (img) this.bg.copyFrom(img); else r.bg(this.bg);
+      this.style.bgFinish?.(this.bg);
       this.bgId = r.id;
     }
     const fb = this.fb;
@@ -640,6 +676,7 @@ export class Game {
     r.anim?.(fb, this.t);
     if (this.S) {
       const list: { y: number; draw: () => void }[] = [];
+      const k = fb.k;
       const actor = (s: FB, x: number, y: number, shadowW = 7) => { fb.shadow(x + 1, y, shadowW, 2.2, 0.42); fb.blit(s, x, y); };
       (r.props ?? []).forEach((p, i) => {
         if (p.visible && !p.visible()) return;
@@ -650,11 +687,11 @@ export class Game {
         const rt = this.npcPos(n);
         const L = typeof n.look === 'function' ? n.look() : n.look;
         const act = rt.moving ? 'walk' : typeof n.act === 'function' ? n.act() : n.act ?? 'stand';
-        list.push({ y: rt.y, draw: () => actor(sprite(L, rt.dir, rt.frame, act), rt.x, rt.y, 7 * (L.scale ?? 1)) });
+        list.push({ y: rt.y, draw: () => actor(sprite(L, rt.dir, rt.frame, act, k), rt.x, rt.y, 7 * (L.scale ?? 1)) });
       }
-      for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => fb.blit(sprite(c.def.look, 3, 0, 'dead'), c.x, c.y) });
-      for (const m of this.monsters) list.push({ y: m.y, draw: () => actor(sprite(m.def.look, m.dir, m.frame, 'walk'), m.x, m.y, m.def.look.kind ? 12 : 7) });
-      list.push({ y: this.S.y, draw: () => actor(sprite(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand'), this.S.x, this.S.y) });
+      for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => fb.blit(sprite(c.def.look, 3, 0, 'dead', k), c.x, c.y) });
+      for (const m of this.monsters) list.push({ y: m.y, draw: () => actor(sprite(m.def.look, m.dir, m.frame, 'walk', k), m.x, m.y, m.def.look.kind ? 12 : 7) });
+      list.push({ y: this.S.y, draw: () => actor(sprite(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand', k), this.S.x, this.S.y) });
       list.sort((a, b) => a.y - b.y);
       for (const d of list) d.draw();
     }
@@ -671,13 +708,17 @@ export class Game {
   /** A prop rendered into its own transparent layer (pixels taken from a painted background if present). */
   propLayer(r: Room, i: number): FB {
     const p = r.props![i];
-    const key = `${r.id}|${i}|${p.key?.() ?? ''}`;
+    const key = `${r.id}|${i}|${p.key?.() ?? ''}|${this.style.id}`;
     let layer = this.propCache.get(key);
     if (layer) return layer;
-    layer = new FB(320, 200, T);
+    layer = new FB(320, 200, T, this.fb.k);
     p.draw(layer);
     const painted = backgroundFor(r.id);
-    if (painted) for (let k = 0; k < layer.px.length; k++) if (layer.px[k] !== T) layer.px[k] = painted.px[k];
+    if (painted) {
+      const src = new FB(320, 200, 0, this.fb.k);
+      src.copyFrom(painted);
+      for (let k = 0; k < layer.px.length; k++) if (layer.px[k] !== T) layer.px[k] = src.px[k];
+    }
     this.propCache.set(key, layer);
     return layer;
   }
@@ -716,7 +757,7 @@ export class Game {
     if (!this.S) return;
     const h = this.hero;
     UI.$('st-score').textContent = `Score: ${this.score} of ${MAX_SCORE}`;
-    UI.$('st-name').textContent = `${h.name} the ${h.cls === 'fighter' ? 'Fighter' : h.cls === 'mage' ? 'Magic User' : 'Thief'}`;
+    UI.$('st-name').textContent = `${h.name}${classTitle(h) ? ' the ' + classTitle(h) : ''}`;
     UI.meter('m-hp', h.hp, maxHP(h));
     UI.meter('m-sp', h.sp, maxSP(h));
     UI.meter('m-mp', h.mp, maxMP(h));
@@ -979,7 +1020,7 @@ export class Game {
     const h = this.hero;
     const hp = h.hp / maxHP(h);
     const state = hp > 0.8 ? 'in fine shape' : hp > 0.5 ? 'a bit battered' : hp > 0.25 ? 'badly hurt' : 'close to death';
-    return `You are ${h.name}, a would-be hero and ${h.cls === 'fighter' ? 'fighter' : h.cls === 'mage' ? 'magic user' : 'thief'} by training. You are ${state}. You carry ${h.silver} silver.`;
+    return `You are ${h.name}, a would-be hero${h.cls === 'hero' ? '' : ` and ${classTitle(h).toLowerCase()} by training`}. You are ${state}. You carry ${h.silver} silver.`;
   }
 
   searchCorpse(c: Corpse) {
@@ -1061,6 +1102,10 @@ export class Game {
     if (!this.cast(spell)) return;
     this.say(spell === 'open' ? "Nothing here is locked. The magic dissipates." : "There's nothing here to fetch. The magic dissipates.");
   }
+}
+
+export function classTitle(h: Hero) {
+  return ({ hero: '', fighter: 'Fighter', mage: 'Magic User', thief: 'Thief' } as const)[h.cls];
 }
 
 export const G = new Game();

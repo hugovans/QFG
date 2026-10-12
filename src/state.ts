@@ -1,4 +1,4 @@
-export type ClassId = 'fighter' | 'mage' | 'thief';
+export type ClassId = 'hero' | 'fighter' | 'mage' | 'thief';
 export type Stat = 'str' | 'int' | 'agi' | 'vit' | 'luck';
 export type Skill = 'weapon' | 'parry' | 'dodge' | 'stealth' | 'lockpick' | 'throwing' | 'climbing' | 'magic';
 
@@ -33,6 +33,19 @@ export interface ClassDef {
   spells: string[];
 }
 
+/**
+ * The one hero the game currently uses: a jack of all trades with a little of every skill,
+ * so every puzzle's fighter, thief and magic solutions stay open.
+ */
+export const HERO: ClassDef = {
+  id: 'hero', name: 'Hero',
+  blurb: 'A would-be hero with a sword, a shield, a lockpick and a single spell.',
+  stats: { str: 35, int: 30, agi: 35, vit: 40, luck: 25 },
+  skills: { weapon: 35, parry: 30, dodge: 30, stealth: 25, lockpick: 25, throwing: 25, climbing: 20, magic: 20 },
+  inv: { sword: 1, shield: 1, leather: 1, rations: 2, lockpick: 1, mana: 1 }, spells: ['zap'],
+};
+
+/** The original three classes, parked while the game has a single hero. */
 export const CLASSES: ClassDef[] = [
   {
     id: 'fighter', name: 'Fighter',
