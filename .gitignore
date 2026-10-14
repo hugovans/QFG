@@ -6,3 +6,4 @@ dist-single
 art/layouts
 art/raw
 .env
+art/lpc-cache

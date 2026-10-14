@@ -1,7 +1,8 @@
 import { FB, rng } from './gfx';
 import { Grade, RENDER, T, b8, g8, gradeDawn, gradeDusk, gradeNight, r8 } from './palette';
 import { STYLES, Style, styleFor } from './styles';
-import { DIR, Look, LOOKS, WALK_FRAMES, sprite } from './sprites';
+import { Action, DIR, Look, LOOKS, WALK_FRAMES, sprite } from './sprites';
+import { hasLpc, lpcFoot, lpcFrame, lpcFrames, lpcSize } from './lpc';
 import { backgroundFor } from './backgrounds';
 import { NPC, Rect, Room, ROOMS, Side } from './registry';
 import { parse, Parsed } from './parser';
@@ -105,7 +106,7 @@ export class Game {
   get isDay() { return !this.isNight; }
 
   get heroLook(): Look {
-    return this.hero.cls === 'mage' ? LOOKS.heroMage : this.hero.cls === 'thief' ? LOOKS.heroThief : LOOKS.heroFighter;
+    return this.hero.cls === 'mage' ? LOOKS.heroMage : this.hero.cls === 'thief' ? LOOKS.heroThief : this.hero.cls === 'fighter' ? LOOKS.heroFighter : LOOKS.hero;
   }
 
   flag(k: string) { return this.S.flags[k]; }
@@ -435,7 +436,7 @@ export class Game {
     this.target = null;
     this.mode = 'combat';
     this.combatActor = actor;
-    this.applyStyle(styleFor(this.room.id));
+    this.applyStyle(styleFor());
     this.combat = new Combat(MONSTERS[id], { arena: this.room.arena ?? 'forest', ...opts });
     AUDIO.music('combat');
     UI.$('combat').hidden = false;
@@ -631,9 +632,12 @@ export class Game {
     this.styleDirty = false;
     this.style = st;
     RENDER.smooth = st.smooth;
-    if (this.fb.k !== st.k) {
+    const art = st.art ?? st.k;
+    if (this.fb.k !== st.k || this.bg.k !== art) {
       this.fb = new FB(320, 200, 0, st.k);
-      this.bg = new FB(320, 200, 0, st.k);
+      this.bg = new FB(320, 200, 0, art);
+      this.scene = new FB(320, 200, 0, art);
+      this.fb.lightStep = st.k / art;
       if (this.canvas) {
         this.canvas.width = this.fb.w;
         this.canvas.height = this.fb.h;
@@ -646,6 +650,9 @@ export class Game {
 
   onStyle: ((st: Style) => void) | null = null;
 
+  /** Scratch frame at scenery density, for styles that draw scenery coarser than the screen. */
+  private scene = new FB(320, 200, 0, 1);
+
   private styleDirty = false;
 
   /** Re-render everything in the current style (e.g. after the style setting changes). */
@@ -653,7 +660,7 @@ export class Game {
 
   render() {
     const room = this.S ? this.room : ROOMS[this.titleRoom];
-    const st = styleFor(room.id);
+    const st = styleFor();
     this.applyStyle(st);
     if (this.mode === 'combat' && this.combat) this.combat.render(this.fb, this.t);
     else if (this.S || this.mode === 'title' || this.mode === 'create') this.drawScene();
@@ -671,57 +678,105 @@ export class Game {
       this.style.bgFinish?.(this.bg);
       this.bgId = r.id;
     }
-    const fb = this.fb;
-    fb.copyFrom(this.bg);
-    r.anim?.(fb, this.t);
+    const fb = this.fb, k = fb.k, art = this.bg.k;
+    const grade = this.ambient();
+    // When the scenery is coarser than the screen, the time-of-day grade is applied to the
+    // scenery before it is scaled up, and to each sprite as it is drawn: the same picture
+    // as grading the whole screen afterwards, at a fraction of the cost.
+    const early = art !== k;
+    this.spriteFx = early ? grade : null;
+    if (!early) { fb.copyFrom(this.bg); r.anim?.(fb, this.t); }
+    else {
+      // Animate the scenery at its own resolution, then scale it up so it stays pixel art.
+      this.scene.copyFrom(this.bg);
+      r.anim?.(this.scene, this.t);
+      if (grade) this.scene.grade(grade);
+      fb.copyFrom(this.scene);
+    }
     if (this.S) {
       const list: { y: number; draw: () => void }[] = [];
-      const k = fb.k;
-      const actor = (s: FB, x: number, y: number, shadowW = 7) => { fb.shadow(x + 1, y, shadowW, 2.2, 0.42); fb.blit(s, x, y); };
       (r.props ?? []).forEach((p, i) => {
         if (p.visible && !p.visible()) return;
         const layer = this.propLayer(r, i);
-        list.push({ y: p.y, draw: () => fb.blit(layer, 0, 0, { anchor: 'tl' }) });
+        if (layer) list.push({ y: p.y, draw: () => fb.blit(layer.fb, layer.x, layer.y, { anchor: 'tl', scale: k / art, fx: this.spriteFx }) });
       });
       for (const n of this.visibleNpcs()) {
         const rt = this.npcPos(n);
         const L = typeof n.look === 'function' ? n.look() : n.look;
         const act = rt.moving ? 'walk' : typeof n.act === 'function' ? n.act() : n.act ?? 'stand';
-        list.push({ y: rt.y, draw: () => actor(sprite(L, rt.dir, rt.frame, act, k), rt.x, rt.y, 7 * (L.scale ?? 1)) });
+        list.push({ y: rt.y, draw: () => this.drawActor(L, rt.dir, rt.frame, act, rt.x, rt.y, 7 * (L.scale ?? 1)) });
       }
-      for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => fb.blit(sprite(c.def.look, 3, 0, 'dead', k), c.x, c.y) });
-      for (const m of this.monsters) list.push({ y: m.y, draw: () => actor(sprite(m.def.look, m.dir, m.frame, 'walk', k), m.x, m.y, m.def.look.kind ? 12 : 7) });
-      list.push({ y: this.S.y, draw: () => actor(sprite(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand', k), this.S.x, this.S.y) });
+      for (const c of this.corpses) list.push({ y: c.y - 8, draw: () => this.drawActor(c.def.look, 3, 0, 'dead', c.x, c.y, 0) });
+      for (const m of this.monsters) list.push({ y: m.y, draw: () => this.drawActor(m.def.look, m.dir, m.frame, 'walk', m.x, m.y, m.def.look.kind ? 12 : 7) });
+      list.push({ y: this.S.y, draw: () => this.drawActor(this.heroLook, this.S.dir, this.frame, this.moving ? 'walk' : 'stand', this.S.x, this.S.y, 7) });
       list.sort((a, b) => a.y - b.y);
       for (const d of list) d.draw();
     }
-    const grade = this.ambient();
-    if (grade) fb.grade(grade);
+    if (grade && !early) fb.grade(grade);
     const dark = grade === gradeNight;
     if (dark && r.outdoor) this.stars(fb);
     if (r.lights && this.lightsOn) for (const w of r.lights) this.litWindow(fb, w.x, w.y, w.w, w.h, dark);
     r.glow?.(fb, this.t, dark || !r.outdoor);
   }
 
-  private propCache = new Map<string, FB>();
+  private propCache = new Map<string, { fb: FB; x: number; y: number } | null>();
 
-  /** A prop rendered into its own transparent layer (pixels taken from a painted background if present). */
-  propLayer(r: Room, i: number): FB {
+  /**
+   * A prop rendered at scenery density and cropped to its bounds (pixels taken from a
+   * painted background if present), so actors can walk in front of or behind it.
+   */
+  propLayer(r: Room, i: number): { fb: FB; x: number; y: number } | null {
     const p = r.props![i];
+    const art = this.bg.k;
     const key = `${r.id}|${i}|${p.key?.() ?? ''}|${this.style.id}`;
-    let layer = this.propCache.get(key);
-    if (layer) return layer;
-    layer = new FB(320, 200, T, this.fb.k);
+    if (this.propCache.has(key)) return this.propCache.get(key)!;
+    const layer = new FB(320, 200, T, art);
     p.draw(layer);
     const painted = backgroundFor(r.id);
     if (painted) {
-      const src = new FB(320, 200, 0, this.fb.k);
+      const src = new FB(320, 200, 0, art);
       src.copyFrom(painted);
-      for (let k = 0; k < layer.px.length; k++) if (layer.px[k] !== T) layer.px[k] = src.px[k];
+      for (let j = 0; j < layer.px.length; j++) if (layer.px[j] !== T) layer.px[j] = src.px[j];
     }
-    this.propCache.set(key, layer);
-    return layer;
+    let x0 = layer.w, y0 = layer.h, x1 = -1, y1 = -1;
+    for (let y = 0; y < layer.h; y++)
+      for (let x = 0; x < layer.w; x++)
+        if (layer.px[y * layer.w + x] !== T) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    let out: { fb: FB; x: number; y: number } | null = null;
+    if (x1 >= 0) {
+      const fb = new FB(x1 - x0 + 1, y1 - y0 + 1, T);
+      for (let y = y0; y <= y1; y++) fb.px.set(layer.px.subarray(y * layer.w + x0, y * layer.w + x1 + 1), (y - y0) * fb.w);
+      out = { fb, x: x0 / art, y: y0 / art };
+    }
+    this.propCache.set(key, out);
+    return out;
   }
+
+  /**
+   * Draw a character standing at (x, y). LPC sprites are used where the look has them,
+   * otherwise the code-drawn sprite, built at scenery density so it matches the scenery.
+   */
+  drawActor(L: Look, dir: number, frame: number, act: Action, x: number, y: number, shadowW: number) {
+    const fb = this.fb, k = fb.k;
+    if (hasLpc(L.id)) {
+      const sc = lpcSize(L.id);
+      let f: FB | null = null;
+      if (act === 'dead') f = lpcFrame(L.id, 'hurt', 0, 5);
+      else if (act === 'walk') f = lpcFrame(L.id, 'walk', dir, 1 + (frame % 8));
+      else if (act === 'cast' && lpcFrames(L.id, 'spellcast')) f = lpcFrame(L.id, 'spellcast', dir, 3);
+      if (!f) f = lpcFrame(L.id, 'walk', dir, 0)!;
+      if (act !== 'dead') fb.shadow(x + 1, y, 9 * sc, 2.4 * sc, 0.4);
+      fb.blit(f, x, y + lpcFoot(f.w) * sc, { scale: sc * k, fx: this.spriteFx });
+      return;
+    }
+    const art = this.bg.k;
+    const s = sprite(L, dir, frame, act, art);
+    if (shadowW) fb.shadow(x + 1, y, shadowW, 2.2, 0.42);
+    fb.blit(s, x, y, { scale: k / art, fx: this.spriteFx });
+  }
+
+  /** Colour grade applied to sprites as they're drawn (see drawScene). */
+  private spriteFx: Grade | null = null;
 
   litWindow(fb: FB, x: number, y: number, w: number, h: number, dark: boolean) {
     fb.fill(x, y, w, h, (px, py) => {

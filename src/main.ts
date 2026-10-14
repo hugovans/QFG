@@ -5,7 +5,8 @@ import { AUDIO } from './audio';
 import * as UI from './ui';
 import { ROOMS } from './registry';
 import { loadBackgrounds } from './backgrounds';
-import { STYLES, STYLE_ORDER, StyleId, forcedStyle, setForcedStyle } from './styles';
+import { loadLpc, lpcPortrait } from './lpc';
+import { DEFAULT_STYLE, STYLES, STYLE_ORDER, StyleId, forcedStyle, setForcedStyle } from './styles';
 import { LOOKS, Look, portrait } from './sprites';
 import { FB } from './gfx';
 import { T } from './palette';
@@ -159,20 +160,19 @@ function showEnd(kind: 'death' | 'win', title: string, text: string) {
 }
 
 function showStyles() {
-  const cur = forcedStyle();
-  const opt = (id: StyleId | null, title: string, sub: string) =>
-    `<button data-style="${id ?? 'room'}" aria-pressed="${cur === id}"><b>${id ?? '★'}</b>${UI.esc(title)}<span>${UI.esc(sub)}</span></button>`;
+  const cur = forcedStyle() ?? DEFAULT_STYLE;
+  const opt = (id: StyleId, title: string, sub: string) =>
+    `<button data-style="${id}" aria-pressed="${cur === id}"><b>${id}</b>${UI.esc(title)}<span>${UI.esc(sub)}</span></button>`;
   UI.showPanel(`
     <h2>Visual style</h2>
-    <p>Each part of the valley is drawn in a different style, from chunky early pixels to smooth high resolution. Pick one to see every room that way.</p>
+    <p>F is the game's look. A to E are the earlier experiments, from chunky early pixels to smooth high resolution.</p>
     <div class="styles">
-      ${opt(null, 'Each room in its own style', 'Outside the town A · town B · healer and meadow C · river and wizard D · kobold and fortress E')}
       ${STYLE_ORDER.map((id) => opt(id, STYLES[id].name, STYLES[id].detail)).join('')}
     </div>
     <div class="row end"><button id="p-close">Close</button></div>`, (root) => {
     root.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((b) => b.addEventListener('click', () => {
       const v = b.dataset.style!;
-      setForcedStyle(v === 'room' ? null : (v as StyleId));
+      setForcedStyle(v === DEFAULT_STYLE ? null : (v as StyleId));
       G.restyle();
       UI.hidePanel();
     }));
@@ -331,13 +331,14 @@ UI.setPortraitProvider((who) => {
   if (!look)
     for (const r of Object.values(ROOMS))
       for (const n of r.npcs ?? []) if (n.name.replace(/^the /, '') === who.replace(/^the /, '')) look = typeof n.look === 'function' ? n.look() : n.look;
-  const url = look && !look.kind ? fbToDataURL(portrait(look)) : null;
+  const lpc = look ? lpcPortrait(look.id) : null;
+  const url = lpc ? fbToDataURL(lpc) : look && !look.kind ? fbToDataURL(portrait(look)) : null;
   portraitCache.set(who, url);
   return url;
 });
 
 if (!ROOMS[G.titleRoom]) throw new Error('title room missing');
-loadBackgrounds().finally(() => {
+Promise.all([loadBackgrounds(), loadLpc()]).finally(() => {
   showTitle();
   requestAnimationFrame(frame);
 });

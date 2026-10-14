@@ -115,6 +115,8 @@ export class FB {
   private block(x0: number, y0: number, x1: number, y1: number, c: Col) {
     const v = c < 16 ? PAL16[c] : c;
     const xa = Math.max(0, x0), xb = Math.min(this.w - 1, x1), ya = Math.max(0, y0), yb = Math.min(this.h - 1, y1);
+    // Entirely off-screen: bail out, or a negative end index would make fill() wrap round the buffer.
+    if (xb < xa || yb < ya) return;
     for (let y = ya; y <= yb; y++) this.px.fill(v, y * this.w + xa, y * this.w + xb + 1);
   }
 
@@ -271,15 +273,29 @@ export class FB {
   }
 
   /** Additive light with quadratic falloff (window glow, fire, magic). */
+  /**
+   * Physical pixels per lighting cell. Styles that draw scenery coarser than the screen set
+   * this so glows fall in the same chunky steps as the scenery (and cost less).
+   */
+  lightStep = 1;
+
   glow(cx: number, cy: number, r: number, c: Col, intensity = 0.6) {
-    const cr = r8(c), cg = g8(c), cb = b8(c);
-    this.fill(cx - r, cy - r, r * 2 + 1, r * 2 + 1, (x, y) => {
-      const dx = x - cx, dy = y - cy, d = (dx * dx + dy * dy) / (r * r);
-      if (d >= 1) return T;
-      const kk = (1 - d) * (1 - d) * intensity, p = this.get(x, y);
-      if (p === T) return T;
-      return rgb(r8(p) + cr * kk, g8(p) + cg * kk, b8(p) + cb * kk);
-    });
+    const cr = r8(c), cg = g8(c), cb = b8(c), k = this.k, g = this.lightStep, px = this.px, w = this.w;
+    const x0 = Math.max(0, Math.floor(((cx - r) * k) / g) * g), x1 = Math.min(w, Math.ceil((cx + r + 1) * k));
+    const y0 = Math.max(0, Math.floor(((cy - r) * k) / g) * g), y1 = Math.min(this.h, Math.ceil((cy + r + 1) * k));
+    const rr = r * r;
+    for (let by = y0; by < y1; by += g)
+      for (let bx = x0; bx < x1; bx += g) {
+        const dx = (bx + 0.5 * g) / k - cx, dy = (by + 0.5 * g) / k - cy, d = (dx * dx + dy * dy) / rr;
+        if (d >= 1) continue;
+        const kk = (1 - d) * (1 - d) * intensity, ar = cr * kk, ag = cg * kk, ab = cb * kk;
+        for (let y = by; y < by + g && y < y1; y++)
+          for (let x = bx, i = y * w + bx; x < bx + g && x < x1; x++, i++) {
+            const p = px[i];
+            if (p === T) continue;
+            px[i] = rgb(r8(p) + ar, g8(p) + ag, b8(p) + ab);
+          }
+      }
   }
 
   /** Scatter single logical pixels. */
@@ -343,7 +359,19 @@ export class FB {
 
   copyFrom(src: FB) {
     if (src.px.length === this.px.length) { this.px.set(src.px); return; }
-    // different densities: nearest-neighbour resample
+    // different densities: nearest-neighbour resample (fast path for whole-number scaling up)
+    const f = this.w / src.w;
+    if (f === Math.floor(f) && this.h === src.h * f) {
+      for (let sy = 0; sy < src.h; sy++) {
+        const row = sy * f * this.w;
+        for (let sx = 0; sx < src.w; sx++) {
+          const c = src.px[sy * src.w + sx];
+          for (let i = 0; i < f; i++) this.px[row + sx * f + i] = c;
+        }
+        for (let i = 1; i < f; i++) this.px.copyWithin(row + i * this.w, row, row + this.w);
+      }
+      return;
+    }
     for (let y = 0; y < this.h; y++) {
       const sy = Math.min(src.h - 1, Math.floor((y * src.h) / this.h));
       for (let x = 0; x < this.w; x++) this.px[y * this.w + x] = src.px[sy * src.w + Math.min(src.w - 1, Math.floor((x * src.w) / this.w))];

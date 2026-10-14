@@ -1,6 +1,7 @@
 import { FB, drawNumber, fbm, noise } from './gfx';
 import { Col, RAMP, T, fxFlash, fxGlow, fxGrey, fxHurt, gradeNight, mix, rampAt } from './palette';
-import { sprite } from './sprites';
+import { Look, sprite } from './sprites';
+import { LPC_SCALE, LpcAnim, hasLpc, lpcFoot, lpcFrame, lpcFrames, lpcSize } from './lpc';
 import type { MonsterDef } from './monsters';
 import { G } from './game';
 import { AUDIO } from './audio';
@@ -41,7 +42,10 @@ export class Combat {
   bolt: { kind: 'flame' | 'fire'; t: number; dur: number } | null = null;
   outcome: 'win' | 'flee' | 'calm' | null = null;
   endT = 0;
-  bg = new FB(320, 200, 0, G.fb.k);
+  /** The arena, drawn at scenery density (coarser than the screen in pixel-art styles). */
+  bg = new FB(320, 200, 0, G.bg.k);
+  /** Seconds since the foe fell, for its falling animation. */
+  deadT = 0;
 
   constructor(def: MonsterDef, opts: CombatOpts) {
     this.def = def;
@@ -167,6 +171,7 @@ export class Combat {
         if (G.mode !== 'combat') return;
       }
     }
+    if (this.ms === 'dead') this.deadT += dt;
     if (this.ms === 'dead' || this.ms === 'calm') return;
     this.mt -= dt;
     if (this.mt > 0) return;
@@ -342,6 +347,47 @@ export class Combat {
     art.bush(fb, 60, 118, 18, 3); art.bush(fb, 270, 120, 16, 4);
   }
 
+  /** Screen pixels per sprite pixel for an LPC fighter: a whole number, so pixels stay square. */
+  lpcPx(fb: FB, L: Look) {
+    return Math.max(1, Math.round(((5 * fb.k) / 3) * (lpcSize(L.id) / LPC_SCALE) - 0.01));
+  }
+
+  /** Draw an LPC fighter; false if the look has no LPC sprites. */
+  drawLpc(fb: FB, L: Look, dir: number, anim: LpcAnim, frame: number, x: number, ground: number, fx: ((c: Col) => Col) | null) {
+    if (!hasLpc(L.id)) return false;
+    const f = lpcFrame(L.id, anim, dir, frame) ?? lpcFrame(L.id, 'walk', dir, 0)!;
+    const ps = this.lpcPx(fb, L);
+    fb.blit(f, x, ground + (lpcFoot(f.w) * ps) / fb.k, { scale: ps, fx });
+    return true;
+  }
+
+  /** The hero's animation and frame for the current action. */
+  heroPose(): [LpcAnim, number] {
+    const id = G.heroLook.id;
+    const step = (dur: number, n: number) => Math.min(n - 1, Math.floor((1 - this.ht / dur) * n));
+    switch (this.hs) {
+      case 'attack': return ['slash', step(0.38, lpcFrames(id, 'slash'))];
+      case 'parry': return lpcFrames(id, 'thrust') ? ['thrust', 1] : ['slash', 1];
+      case 'dodge': return ['walk', 3];
+      case 'cast': return lpcFrames(id, 'spellcast') ? ['spellcast', step(0.7, lpcFrames(id, 'spellcast'))] : ['walk', 0];
+      default: return ['walk', 0];
+    }
+  }
+
+  /** The foe's animation and frame: wind up, strike, recover, or fall. */
+  foePose(): [LpcAnim, number] {
+    const id = this.def.look.id;
+    const attack: LpcAnim | null = (['slash', 'thrust', 'spellcast'] as const).find((a) => lpcFrames(id, a) > 0) ?? null;
+    const n = attack ? lpcFrames(id, attack) : 0;
+    switch (this.ms) {
+      case 'windup': return attack ? [attack, this.mt < this.def.windup * 0.5 ? 2 : 1] : ['walk', 0];
+      case 'strike': return attack ? [attack, Math.min(n - 1, 3 + Math.floor((1 - this.mt / 0.3) * (n - 3)))] : ['walk', 0];
+      case 'recover': return attack ? [attack, n - 1] : ['walk', 0];
+      case 'dead': return lpcFrames(id, 'hurt') ? ['hurt', Math.min(5, Math.floor(this.deadT * 10))] : ['walk', 0];
+      default: return ['walk', 0];
+    }
+  }
+
   render(fb: FB, t: number) {
     fb.copyFrom(this.bg);
     const h = G.hero;
@@ -362,11 +408,18 @@ export class Combat {
 
     fb.shadow(hx + 4, ground, 22, 5, 0.5);
     fb.shadow(mx, ground, beast ? 34 : 24 * (L.scale ?? 1), 5, 0.5);
-    fb.blit(sprite(G.heroLook, 3, 0, heroAct, S), hx, ground, { fx: this.hflash > 0 ? fxHurt : null });
-    fb.blit(sprite(L, 2, 0, mAct, S), mx, ground, { fx: mfx });
+    const hfx = this.hflash > 0 ? fxHurt : null;
+    if (!this.drawLpc(fb, G.heroLook, 3, ...this.heroPose(), hx, ground, hfx))
+      fb.blit(sprite(G.heroLook, 3, 0, heroAct, S), hx, ground, { fx: hfx });
+    if (!this.drawLpc(fb, L, 2, ...this.foePose(), mx, ground, mfx))
+      fb.blit(sprite(L, 2, 0, mAct, S), mx, ground, { fx: mfx });
 
     if (this.night) fb.grade(gradeNight);
-    if (this.def.look.eye && this.ms !== 'dead') fb.glow(mx + (beast ? -26 : -6), ground - (beast ? 44 : 70 * (L.scale ?? 1)), 10, this.def.look.eye, this.night ? 0.5 : 0.15);
+    if (this.def.look.eye && this.ms !== 'dead') {
+      const ps = this.lpcPx(fb, L) / fb.k;
+      if (hasLpc(L.id)) fb.glow(mx - 4 * ps, ground - 38 * ps, 10, this.def.look.eye, this.night ? 0.5 : 0.15);
+      else fb.glow(mx + (beast ? -26 : -6), ground - (beast ? 44 : 70 * (L.scale ?? 1)), 10, this.def.look.eye, this.night ? 0.5 : 0.15);
+    }
     if (this.zap) { fb.glow(hx + 30, ground - 50, 22, 0x80b0ff, 0.5 + Math.sin(t * 30) * 0.2); for (let i = 0; i < 6; i++) fb.pset(hx + 24 + Math.random() * 30, ground - 70 + Math.random() * 40, 0xd0e8ff); }
 
     if (this.bolt) {

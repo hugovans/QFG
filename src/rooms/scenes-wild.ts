@@ -361,33 +361,36 @@ const koboldcave: Scene = {
   bg(fb) {
     A.sky(fb, 60, 101, 1);
     A.mountains(fb, 40, 30, 41, 0);
-    fb.fill(0, 18, 320, 110, (x, y) => {
-      const top = 22 + Math.sin(x * 0.05) * 6 + (fbm(x * 0.04, 0, 3) - 0.5) * 18;
-      if (y < top) return T;
-      return rampAt(RAMP.rock, 0.45 + (fbm(x * 0.04, y * 0.07, 9, 5) - 0.5) * 0.9 + ((x + y * 0.5) % 23 < 1 ? -0.3 : 0) - (y - top) / 300, x, y);
-    });
+    const top = (x: number) => 22 + Math.sin(x * 0.05) * 6 + (fbm(x * 0.04, 0, 3) - 0.5) * 18;
+    A.rockFace(fb, 14, 128, 77, RAMP.rock, top);
+    // moss and creepers on the ledges
     const r = rng(9);
-    for (let i = 0; i < 9; i++) {
-      const x = r() * 320, y = 40 + r() * 70, w = 16 + r() * 30;
-      fb.limb(x - w / 2, y, x + w / 2, y + (r() - 0.5) * 4, 1.6, 1.2, RAMP.rock, { amb: 0.6 });
-      fb.fill(x - w / 2, y + 2, w, 4, (px, py) => mix(fb.get(px, py), 0x000000, 0.35 - (py - y - 2) * 0.08));
+    for (let i = 0; i < 160; i++) {
+      const x = r() * 320, y = 20 + r() * 100;
+      if (y > top(x) + 3 && fb.get(x, y - 1) !== fb.get(x, y)) fb.pset(x, y, r() < 0.5 ? RAMP.grass[3] : RAMP.grass[2]);
     }
-    for (let i = 0; i < 7; i++) { let x = r() * 320, y = 30 + r() * 40; for (let k = 0; k < 8; k++) { const nx = x + (r() - 0.5) * 8, ny = y + 4 + r() * 5; fb.line(x, y, nx, ny, RAMP.rock[0]); x = nx; y = ny; } }
-    fb.fill(144, 58, 82, 70, (x, y) => {
-      const d = ((x - 185) / 38) ** 2 + ((y - 128) / 64) ** 2;
+    // the cave mouth, ringed with rocks
+    fb.fill(146, 60, 78, 70, (x, y) => {
+      const d = ((x - 185) / 36) ** 2 + ((y - 128) / 62) ** 2;
       return d > 1 ? T : mix(0x020203, 0x1a1512, Math.max(0, d - 0.55) * 1.8);
     });
-    A.grass(fb, 124, 37, RAMP.grassDry);
+    for (let i = 0; i <= 10; i++) {
+      const a = Math.PI + (i / 10) * Math.PI, x = 185 + Math.cos(a) * 40, y = 128 + Math.sin(a) * 66;
+      A.boulder(fb, x, y, 8, 6, 300 + i, RAMP.rock, 0.12);
+    }
+    A.grass(fb, 124, 37);
     fb.fill(0, 124, 320, 6, (x, y) => mix(fb.get(x, y), 0x000000, 0.35 - (y - 124) * 0.05));
     A.dirt(fb, [[160, 124], [210, 124], [222, 150], [320, 160], [320, 172], [200, 170], [0, 160], [0, 148], [150, 145]], 12, RAMP.mud);
+    // old bones near the entrance
     for (let i = 0; i < 6; i++) {
       const x = 110 + i * 30, y = 150 + (i % 2) * 22;
-      fb.limb(x, y, x + 7, y + 2, 1, 0.9, RAMP.clothWhite); fb.sphere(x, y, 1.6, 1.6, RAMP.clothWhite); fb.sphere(x + 7, y + 2, 1.5, 1.5, RAMP.clothWhite);
+      fb.line(x, y, x + 7, y + 2, RAMP.clothWhite[5]); fb.line(x, y + 1, x + 7, y + 3, RAMP.clothWhite[2]);
+      fb.pset(x - 1, y, RAMP.clothWhite[6]); fb.pset(x + 8, y + 2, RAMP.clothWhite[6]);
     }
     fb.sphere(88, 176, 4.5, 4, RAMP.clothWhite); fb.pset(87, 176, 0x101010); fb.pset(90, 176, 0x101010);
     A.tree(fb, 20, 132, 22, 44, 'dead');
   },
-  props: [{ y: 184, draw(fb) { A.rock(fb, 265, 176, 20, 10, 71); } }],
+  props: [{ y: 184, draw(fb) { A.boulder(fb, 265, 176, 18, 10, 71, RAMP.rock, 0.1); } }],
 };
 
 const koboldDead = () => !!G.flag('koboldDead');
@@ -425,7 +428,7 @@ const gateOpen = () => !!G.flag('gateOpen');
 const fortressgate: Scene = {
   bg(fb) {
     forest(fb, 111, false, 132);
-    A.grass(fb, 132, 43, RAMP.grassDry);
+    A.grass(fb, 132, 43);
     // watchtower
     for (const x of [30, 66]) fb.limb(x, 134, x + (x < 50 ? 4 : -4), 40, 1.8, 1.6, RAMP.wood);
     fb.limb(30, 90, 66, 60, 0.9, 0.9, RAMP.wood); fb.limb(66, 90, 30, 60, 0.9, 0.9, RAMP.wood);
@@ -461,25 +464,33 @@ const fortressgate: Scene = {
 const courtyard: Scene = {
   bg(fb) {
     A.sky(fb, 60, 121, 1);
-    fb.fill(0, 40, 320, 40, (x, y) => rampAt(RAMP.leafDark, 0.25 + (noise(x * 0.1, y * 0.2, 2) - 0.5) * 0.5, x, y));
-    A.palisade(fb, 0, 78, 320, 58, 12);
-    fb.fill(0, 78, 320, 54, (x, y) => rampAt(RAMP.mud, 0.35 + (y - 78) / 200 + (fbm(x * 0.05, y * 0.2, 5) - 0.5) * 0.5, x, y));
-    fb.fill(0, 78, 320, 6, (x, y) => mix(fb.get(x, y), 0x000000, 0.4 - (y - 78) * 0.06));
-    // log hall
-    fb.fill(88, 42, 144, 90, (x, y) => rampAt(RAMP.wood, 0.45 + ((y - 42) % 7 === 0 ? -0.45 : (y - 42) % 7 === 1 ? 0.2 : 0) + (noise(x * 0.1, y * 0.5, 7) - 0.5) * 0.3, x, y));
-    A.roof(fb, 88, 232, 43, 32, 'shingle');
-    fb.fill(144, 92, 32, 40, (x, y) => mix(0x0c0806, 0x2a1a10, (y - 92) / 60));
-    fb.limb(144, 92, 176, 92, 1.8, 1.8, RAMP.wood);
-    for (const x of [100, 206]) { fb.fill(x, 64, 14, 12, () => 0x100a08); fb.limb(x, 70, x + 14, 70, 0.5, 0.5, RAMP.wood); }
-    fb.limb(118, 60, 118, 84, 1.2, 1, RAMP.wood); fb.fill(119, 60, 12, 18, (x, y) => rampAt(RAMP.clothRed, 0.45 + (noise(x * 0.4, y * 0.1, 3) - 0.5) * 0.4, x, y));
-    for (const [x, w] of [[18, 42], [262, 42]]) {
-      fb.cylPoly([[x, 134], [x + w, 134], [x + w / 2, 98]], x + w / 2, w / 2, RAMP.clothWhite, { tex: (px, py) => (noise(px * 0.3, py * 0.1, x) - 0.5) * 0.4 - 0.2 });
-      fb.poly([[x + w / 2 - 5, 134], [x + w / 2 + 5, 134], [x + w / 2, 118]], 0x141010);
+    A.treeline(fb, 62, 26, 12, RAMP.leafDark, 0.2);
+    A.palisade(fb, 0, 84, 320, 62, 12);
+    A.trampled(fb, 84, 21);
+    // log hall: notched log walls under a shingle roof, with a dark open doorway
+    fb.shadow(160, 132, 80, 4, 0.5);
+    A.logWall(fb, 90, 50, 140, 82, 7);
+    A.roof(fb, 84, 236, 51, 34, 'shingle');
+    fb.fill(144, 90, 32, 42, (x, y) => mix(0x0c0806, 0x2a1a10, (y - 90) / 60));
+    fb.frame(143, 89, 34, 43, RAMP.timber[0]);
+    fb.limb(142, 90, 178, 90, 1.8, 1.8, RAMP.wood);
+    for (const x of [102, 204]) {
+      fb.fill(x, 64, 14, 11, (px, py) => mix(0x0c0806, 0x24180e, (py - 64) / 11));
+      fb.frame(x - 1, 63, 16, 13, RAMP.timber[0]);
+      fb.limb(x - 1, 76, x + 15, 76, 0.8, 0.8, RAMP.woodPale);
     }
-    fb.fill(0, 130, 320, 70, (x, y) => rampAt(RAMP.mud, 0.45 + (fbm(x * 0.05, y * 0.12, 3, 4) - 0.5) * 0.7, x, y));
-    fb.fill(0, 130, 320, 6, (x, y) => mix(fb.get(x, y), 0x000000, 0.35 - (y - 130) * 0.05));
-    A.barrel(fb, 76, 150); A.barrel(fb, 250, 152);
-    fb.sphere(160, 160, 14, 4, RAMP.stone);
+    // the crossed-daggers banner by the door
+    fb.limb(124, 58, 124, 100, 1.1, 0.9, RAMP.wood);
+    fb.fill(125, 60, 12, 20, (x, y) => rampAt(RAMP.clothRed, 0.5 + (noise(x * 0.4, y * 0.1, 3) - 0.5) * 0.35 + (x === 125 ? 0.2 : 0), x, y));
+    fb.poly([[125, 80], [137, 80], [131, 86]], RAMP.clothRed[2]);
+    fb.line(127, 63, 135, 75, RAMP.clothYellow[4]); fb.line(135, 63, 127, 75, RAMP.clothYellow[4]);
+    A.tent(fb, 14, 150, 50, 40, 5);
+    A.tent(fb, 258, 150, 50, 40, 6);
+    A.woodpile(fb, 232, 140, 26, 3);
+    A.weaponRack(fb, 64, 140);
+    A.crate(fb, 22, 186, 14, 2); A.crate(fb, 34, 190, 12, 3);
+    A.barrel(fb, 80, 160); A.barrel(fb, 252, 168);
+    A.fireRing(fb, 160, 160, 15, 5, 40);
   },
   anim(fb, t) { for (let i = 0; i < 5; i++) fb.limb(146 + i * 7, 158, 150 + i * 7, 154, 1.5, 1.5, RAMP.bark); A.fire(fb, 160, 156, t, 0.9); },
   glow(fb, t, dark) { fb.glow(160, 146, dark ? 90 : 50, 0xff8a30, (dark ? 0.55 : 0.3) + Math.sin(t * 9) * 0.04); },

@@ -482,24 +482,12 @@ export function cauldron(fb: FB, x: number, base: number, t: number) {
 }
 
 export function caveWalls(fb: FB, seed: number) {
-  fb.fill(0, 0, 320, 124, (x, y) => {
-    const n = fbm(x * 0.025, y * 0.04, seed, 5), strata = Math.sin(y * 0.35 + n * 6) * 0.12;
-    return rampAt(RAMP.rock, 0.28 + (n - 0.5) * 0.9 + strata - y / 500 + (noise(x * 0.6, y * 0.6, seed) - 0.5) * 0.12, x, y);
-  });
-  const r = rng(seed);
-  for (let i = 0; i < 10; i++) {
-    const x = r() * 320, y = 20 + r() * 90, w = 20 + r() * 40;
-    fb.limb(x - w / 2, y, x + w / 2, y + (r() - 0.5) * 6, 2, 1.5, RAMP.rock, { amb: 0.5 });
-    fb.fill(x - w / 2, y + 2, w, 5, (px, py) => mix(fb.get(px, py), 0x000000, 0.4 - (py - y - 2) * 0.07));
-  }
-  for (let x = 4; x < 320; x += 14 + r() * 22) {
-    const len = 12 + r() * 30, w = 3 + r() * 4;
-    fb.cylPoly([[x - w, 0], [x + w, 0], [x + 0.5, len]], x, w, RAMP.rock, { amb: 0.3 });
-    fb.pset(x, len - 1, RAMP.water[6]);
-  }
-  fb.fill(0, 118, 320, 82, (x, y) => rampAt(RAMP.mud, 0.35 + (fbm(x * 0.06, y * 0.15, seed + 9, 4) - 0.5) * 0.6 + (y - 118) / 300, x, y));
-  fb.fill(0, 116, 320, 8, (x, y) => mix(fb.get(x, y), 0x000000, 0.4 - (y - 116) * 0.04));
-  for (let i = 0; i < 30; i++) { const x = r() * 320, y = 125 + r() * 70; fb.sphere(x, y, 1.5 + r() * 3, 1 + r() * 1.5, RAMP.rock); }
+  rockFace(fb, 0, 122, seed);
+  stalactites(fb, seed + 3);
+  trampled(fb, 118, seed + 9, RAMP.mud, false);
+  fb.fill(0, 114, 320, 10, (x, y) => mix(fb.get(x, y), 0x000000, 0.5 - (y - 114) * 0.04));
+  const r = rng(seed + 1);
+  for (let i = 0; i < 9; i++) boulder(fb, r() * 320, 128 + r() * 66, 3 + r() * 5, 2 + r() * 3, seed * 31 + i, RAMP.rock, 0.05);
 }
 
 export function chest(fb: FB, x: number, base: number, open = false) {
@@ -533,3 +521,160 @@ export function candle(fb: FB, x: number, y: number, t: number) {
 }
 
 export function glowAt(x: number, y: number, r: number, c: Col = hex('#ffb060'), i = 0.5): Glow { return { x, y, r, c, i }; }
+
+// ---- pixel-art set pieces ---------------------------------------------------------------
+// Chunkier, hand-placed shapes with facets, outlines and scattered detail, for scenes that
+// read as flat when built from smooth gradients alone.
+
+/** A faceted boulder: an irregular outlined polygon, lit from the upper left facet by facet. */
+export function boulder(fb: FB, cx: number, cy: number, rx: number, ry: number, seed: number, R: Ramp = RAMP.rock, bright = 0) {
+  const r = rng(seed), n = 7 + Math.floor(r() * 3);
+  const pts: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + r() * 0.4, j = 0.78 + r() * 0.26;
+    pts.push([cx + Math.cos(a) * rx * j, Math.min(cy + ry * 0.7, cy + Math.sin(a) * ry * j)]);
+  }
+  fb.poly(pts, (x, y) => {
+    const dx = (x - cx) / rx, dy = (y - cy) / ry;
+    const a = Math.atan2(dy, dx), facet = Math.round((a / (Math.PI * 2)) * n) / n * Math.PI * 2;
+    const light = -Math.cos(facet) * 0.5 - Math.sin(facet) * 0.7;
+    const d = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+    const t = 0.42 + bright + light * d * 0.32 - Math.max(0, dy) * 0.18 + (noise(x * 0.5, y * 0.5, seed) - 0.5) * 0.16;
+    return rampAt(R, t, x, y);
+  });
+  for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; fb.line(a[0], a[1], b[0], b[1], R[0]); }
+  // a crack and a highlight chip
+  const kx = cx + (r() - 0.5) * rx, ky = cy - ry * 0.3;
+  fb.line(kx, ky, kx + (r() - 0.5) * rx * 0.6, ky + ry * 0.5, R[1]);
+  fb.pset(cx - rx * 0.35, cy - ry * 0.45, R[R.length - 1]);
+}
+
+/** A wall of rock built from stacked boulders, darker towards the back (top). */
+export function rockFace(fb: FB, y0: number, y1: number, seed: number, R: Ramp = RAMP.rock, top?: (x: number) => number) {
+  fb.fill(0, y0, 320, y1 - y0, (x, y) => (top && y < top(x) ? T : rampAt(R, 0.08 + (noise(x * 0.2, y * 0.2, seed) - 0.5) * 0.1, x, y)));
+  const r = rng(seed);
+  for (let y = y0 + 4; y < y1 + 6; y += 11 + r() * 4)
+    for (let x = -10 + r() * 12; x < 334; x += 18 + r() * 14) {
+      if (top && y < top(x) + 4) continue;
+      const rx = 10 + r() * 9, ry = 7 + r() * 5, depth = (y - y0) / Math.max(1, y1 - y0);
+      boulder(fb, x, y, rx, ry, Math.floor(r() * 9999), R, -0.12 + depth * 0.14);
+    }
+}
+
+/** Downward rock spikes along the top of a cave, outlined and lit on the left. */
+export function stalactites(fb: FB, seed: number, R: Ramp = RAMP.rock) {
+  const r = rng(seed);
+  for (let x = 4; x < 320; x += 12 + r() * 20) {
+    const len = 10 + r() * 26, w = 3 + r() * 4;
+    const pts = [[x - w, 0], [x + w, 0], [x + 0.5, len]];
+    fb.poly(pts, (px, py) => rampAt(R, 0.5 + (px < x ? 0.15 : -0.12) - py / 120, px, py));
+    fb.line(x - w, 0, x + 0.5, len, R[0]); fb.line(x + w, 0, x + 0.5, len, R[0]);
+    if (r() < 0.5) fb.pset(x, len + 2, RAMP.water[6]);
+  }
+}
+
+/** Packed earth with pebbles, ruts, straw and trampled grass: a camp or cave floor. */
+export function trampled(fb: FB, y0: number, seed: number, R: Ramp = RAMP.dirt, grassy = true) {
+  fb.fill(0, y0, 320, 200 - y0, (x, y) => {
+    const depth = (y - y0) / (200 - y0), n = fbm(x * 0.05, y * 0.12, seed, 4), fine = noise(x * 0.7, y * 0.9, seed + 3);
+    if (grassy && n > 0.62 && fine > 0.35) return rampAt(RAMP.grass, 0.3 + fine * 0.35, x, y);
+    return rampAt(R, 0.28 + depth * 0.22 + (n - 0.5) * 0.55 + (fine - 0.5) * 0.18, x, y);
+  });
+  fb.fill(0, y0, 320, 5, (x, y) => mix(fb.get(x, y), 0x000000, 0.35 - (y - y0) * 0.07));
+  const r = rng(seed + 5);
+  // ruts
+  for (let i = 0; i < 5; i++) {
+    let x = r() * 320, y = y0 + 8 + r() * (190 - y0);
+    for (let k = 0; k < 14; k++) { const nx = x + 3 + r() * 3, ny = y + (r() - 0.5) * 1.5; fb.line(x, y, nx, ny, R[1]); fb.line(x, y + 1, nx, ny + 1, R[Math.min(R.length - 1, 4)]); x = nx; y = ny; }
+  }
+  // pebbles
+  for (let i = 0; i < 110; i++) {
+    const x = Math.floor(r() * 320), y = Math.floor(y0 + 4 + r() * (196 - y0)), big = r() < 0.3;
+    fb.pset(x, y, RAMP.stone[4]); fb.pset(x + 1, y, RAMP.stone[3]); fb.pset(x, y - 1, RAMP.stone[6]); fb.pset(x + 1, y + 1, RAMP.stone[0]);
+    if (big) { fb.pset(x + 2, y, RAMP.stone[2]); fb.pset(x + 1, y - 1, RAMP.stone[5]); fb.pset(x + 2, y + 1, RAMP.stone[0]); }
+  }
+  // straw and twigs
+  for (let i = 0; i < 40; i++) {
+    const x = r() * 320, y = y0 + 6 + r() * (190 - y0), dx = (r() - 0.5) * 6;
+    fb.line(x, y, x + dx, y + (r() - 0.5) * 2, r() < 0.6 ? RAMP.thatch[5] : RAMP.bark[3]);
+  }
+}
+
+/** Horizontal log wall with dark chinking and end grain on both sides. */
+export function logWall(fb: FB, x: number, y: number, w: number, h: number, seed: number, logH = 7, R: Ramp = RAMP.wood) {
+  fb.fill(x, y, w, h, (px, py) => {
+    const v = ((py - y) % logH) / logH, row = Math.floor((py - y) / logH);
+    if (v < 0.12) return R[0];
+    const round = Math.sin(v * Math.PI);
+    const grain = noise(px * 0.12 + row * 7, py * 1.1, seed) - 0.5, knot = noise(px * 0.5, row * 3.1, seed + 2) > 0.86 ? -0.25 : 0;
+    return rampAt(R, 0.18 + round * 0.5 + grain * 0.3 + knot, px, py);
+  });
+  for (let py = y; py < y + h; py += logH)
+    for (const ex of [x - 1, x + w + 1]) {
+      fb.sphere(ex, py + logH / 2, logH / 2, logH / 2 - 0.3, RAMP.woodPale, { amb: 0.5 });
+      fb.pset(ex, py + logH / 2, RAMP.wood[2]);
+    }
+}
+
+/** An A-frame canvas tent seen from the front, its flap tied open. */
+export function tent(fb: FB, x: number, base: number, w: number, h: number, seed: number, R: Ramp = RAMP.sand) {
+  const cx = x + w / 2, top = base - h;
+  fb.shadow(cx + 4, base + 1, w / 2 + 6, 3, 0.45);
+  // guy ropes and pegs
+  for (const [px, s] of [[x - 8, -1], [x + w + 8, 1]] as const) { fb.line(cx + s * 2, top + 3, px, base, RAMP.clothBrown[2]); fb.vline(px, base - 2, base, RAMP.wood[1]); }
+  fb.poly([[x, base], [x + w, base], [cx, top]], (px, py) => {
+    const seam = Math.abs(((px - cx) * h) / (base - py + 0.001)) % 7 < 0.7;
+    const patch = noise(px * 0.15, py * 0.15, seed) > 0.78 ? -0.1 : 0;
+    return rampAt(R, (px < cx ? 0.62 : 0.4) + (seam ? -0.18 : 0) + patch + (py - top) / h * -0.1 + (noise(px * 0.6, py * 0.3, seed) - 0.5) * 0.1, px, py);
+  });
+  fb.line(x, base, cx, top, R[0]); fb.line(x + w, base, cx, top, R[0]); fb.hline(x, x + w, base, R[0]);
+  // open doorway with the flaps folded back
+  const dh = h * 0.62, dw = w * 0.22;
+  fb.poly([[cx - dw, base], [cx + dw, base], [cx, base - dh]], (px, py) => mix(0x0a0806, 0x2a2018, (py - (base - dh)) / dh * 0.6));
+  fb.poly([[cx - dw, base], [cx - dw - 5, base], [cx - 1, base - dh]], (px, py) => rampAt(R, 0.75, px, py));
+  fb.poly([[cx + dw, base], [cx + dw + 5, base], [cx + 1, base - dh]], (px, py) => rampAt(R, 0.3, px, py));
+  fb.limb(cx, top - 3, cx, top + 1, 0.8, 0.8, RAMP.wood);
+}
+
+/** A ring of stones around a fire pit, with ash inside. */
+export function fireRing(fb: FB, cx: number, cy: number, rx: number, ry: number, seed: number) {
+  fb.sphere(cx, cy, rx - 2, ry - 1, RAMP.clothBlack, { amb: 0.4 });
+  const n = 11, order = [...Array(n).keys()].sort((a, b) => Math.sin((a / n) * Math.PI * 2) - Math.sin((b / n) * Math.PI * 2));
+  for (const i of order) {
+    const a = (i / n) * Math.PI * 2;
+    boulder(fb, cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, 3.6, 2.6, seed + i, RAMP.stone, 0.05);
+  }
+}
+
+/** A plank crate with a cross brace. */
+export function crate(fb: FB, x: number, base: number, s = 14, seed = 1) {
+  fb.shadow(x + s / 2 + 2, base, s * 0.7, 2.5, 0.45);
+  fb.fill(x, base - s, s, s, (px, py) => rampAt(RAMP.woodPale, 0.4 + ((py - base) % 4 === 0 ? -0.35 : 0) + (noise(px * 0.4, py, seed) - 0.5) * 0.25, px, py));
+  fb.fill(x, base - s - 4, s, 4, (px, py) => rampAt(RAMP.woodPale, 0.75 + ((px - x) % 4 === 0 ? -0.3 : 0), px, py));
+  fb.line(x + 1, base - 1, x + s - 2, base - s + 1, RAMP.wood[2]); fb.line(x + 1, base - 2, x + s - 2, base - s, RAMP.woodPale[4]);
+  fb.frame(x, base - s - 4, s, s + 4, RAMP.wood[0]);
+}
+
+/** A rack of spears. */
+export function weaponRack(fb: FB, x: number, base: number) {
+  fb.shadow(x + 14, base, 16, 2.5, 0.4);
+  for (let i = 0; i < 4; i++) {
+    const sx = x + 4 + i * 6;
+    fb.limb(sx, base, sx + 2, base - 34, 0.7, 0.7, RAMP.wood);
+    fb.poly([[sx + 0.6, base - 34], [sx + 3.4, base - 34], [sx + 2, base - 40]], (px, py) => rampAt(RAMP.metal, px < sx + 2 ? 0.75 : 0.45, px, py));
+  }
+  for (const px of [x, x + 28]) fb.limb(px, base, px, base - 22, 1.1, 1.1, RAMP.wood);
+  fb.limb(x, base - 18, x + 28, base - 18, 1, 1, RAMP.wood);
+  fb.limb(x, base - 6, x + 28, base - 6, 1, 1, RAMP.wood);
+}
+
+/** A stack of split firewood. */
+export function woodpile(fb: FB, x: number, base: number, w = 30, rows = 4) {
+  fb.shadow(x + w / 2 + 2, base, w / 2 + 3, 2.5, 0.45);
+  for (let r = 0; r < rows; r++)
+    for (let i = 0; i < (w - r * 4) / 5; i++) {
+      const lx = x + r * 2 + i * 5 + 2.5, ly = base - 2.5 - r * 4.4;
+      fb.sphere(lx, ly, 2.4, 2.2, RAMP.woodPale, { amb: 0.5 });
+      fb.pset(lx, ly, RAMP.wood[3]); fb.pset(lx - 2, ly + 1, RAMP.bark[1]);
+    }
+}

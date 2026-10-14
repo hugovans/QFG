@@ -2,10 +2,10 @@ import { FB } from './gfx';
 import { Col, b8, g8, hex, r8, rgb } from './palette';
 
 /**
- * Visual styles, from very chunky to smooth. Each room has a default style so the game
- * shows them side by side; the player can force one style everywhere to compare.
+ * Visual styles. F (pixel-art scenery with LPC character sprites) is the game's look; A to E
+ * run from very chunky to smooth and can be picked from the Style menu to compare.
  */
-export type StyleId = 'A' | 'B' | 'C' | 'D' | 'E';
+export type StyleId = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 export interface Style {
   id: StyleId;
@@ -14,6 +14,8 @@ export interface Style {
   detail: string;
   /** Pixel density: physical pixels per logical 320x200 pixel. */
   k: number;
+  /** Density the scenery is drawn at before being scaled up to `k` (defaults to `k`). */
+  art?: number;
   /** Blend colour ramps smoothly instead of dithering. */
   smooth: boolean;
   /** Post-process applied to the finished frame. */
@@ -102,18 +104,13 @@ export const STYLES: Record<StyleId, Style> = {
   C: { id: 'C', name: '320×200 · full colour', detail: 'VGA-era pixel art with dithered shading', k: 1, smooth: false },
   D: { id: 'D', name: '640×400 · smooth', detail: 'Double resolution, smooth shading', k: 2, smooth: true },
   E: { id: 'E', name: '960×600 · illustrated', detail: 'Triple resolution, soft cinematic finish', k: 3, smooth: true, bgFinish: cinematic },
+  F: { id: 'F', name: 'Pixel art · LPC characters', detail: '320×200 scenery with sprite characters drawn at 3× detail', k: 3, art: 1, smooth: false },
 };
 
-export const STYLE_ORDER: StyleId[] = ['A', 'B', 'C', 'D', 'E'];
+export const STYLE_ORDER: StyleId[] = ['F', 'A', 'B', 'C', 'D', 'E'];
 
-/** Which style each room uses by default. Grouped by area so a walk through the valley shows the range. */
-const ROOM_STYLE: Record<string, StyleId> = {
-  towngate: 'A', castlegate: 'A', crossroads: 'A', northwood: 'A', faerie: 'A',
-  mainstreet: 'B', shop: 'B', inn: 'B', guild: 'B', alley: 'B',
-  thieves: 'C', merchant: 'C', healer: 'C', healerin: 'C', meadow: 'C',
-  trollbridge: 'D', wizard: 'D', wizardin: 'D', deepwood: 'D', koboldcave: 'D',
-  kobold: 'E', fortressgate: 'E', courtyard: 'E', hall: 'E',
-};
+/** The game's look unless the player picks another style to compare. */
+export const DEFAULT_STYLE: StyleId = 'F';
 
 const KEY = 'thornwick.style';
 let forced: StyleId | null = (() => {
@@ -127,6 +124,6 @@ export function setForcedStyle(id: StyleId | null) {
   try { if (id) localStorage.setItem(KEY, id); else localStorage.removeItem(KEY); } catch { /* storage unavailable */ }
 }
 
-export function styleFor(room: string): Style {
-  return STYLES[forced ?? ROOM_STYLE[room] ?? 'C'];
+export function styleFor(): Style {
+  return STYLES[forced ?? DEFAULT_STYLE];
 }

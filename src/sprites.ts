@@ -586,6 +586,7 @@ const P = RAMP;
 const L = (o: Look) => o;
 
 export const LOOKS = {
+  hero: L({ id: 'hero', skin: P.skinTan, hair: P.hairBrown, hairStyle: 'hood', hat: P.clothGreen, top: P.clothGreen, trim: P.leather, legs: P.clothBlack, boots: P.clothBlack, belt: P.leather, weapon: 'sword', eye: hex('#2d4f7c') }),
   heroFighter: L({ id: 'heroF', skin: P.skin, hair: P.hairBlond, hairStyle: 'short', top: P.clothBlue, trim: P.gold, legs: P.clothBrown, boots: P.leather, belt: P.leather, shield: P.woodPale, weapon: 'sword', eye: hex('#2d4f7c') }),
   heroMage: L({ id: 'heroM', skin: P.skin, hair: P.hairBlond, hairStyle: 'short', top: P.clothPurple, robe: P.clothPurple, trim: P.gold, legs: P.clothPurple, boots: P.leather, belt: P.leather, weapon: 'dagger', eye: hex('#2d4f7c') }),
   heroThief: L({ id: 'heroT', skin: P.skin, hair: P.hairBlond, hairStyle: 'short', top: P.leather, trim: P.clothBlack, legs: P.clothBlack, boots: P.leather, belt: P.clothBlack, weapon: 'dagger', skirt: false, eye: hex('#2d4f7c') }),
